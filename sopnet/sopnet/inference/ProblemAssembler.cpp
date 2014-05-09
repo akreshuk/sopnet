@@ -3,6 +3,10 @@
 #include <sopnet/segments/EndSegment.h>
 #include <sopnet/segments/ContinuationSegment.h>
 #include <sopnet/segments/BranchSegment.h>
+
+#include <sopnet/segments/PairSegment.h>
+#include <sopnet/segments/PairSegmentCreator.h>
+
 #include "ProblemAssembler.h"
 
 util::ProgramOption optionMaxMitochondriaNeuronDistance(
@@ -106,6 +110,16 @@ ProblemAssembler::collectSegments() {
 	}
 
 	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments" << std::endl;
+
+    //now try to extract pair segments on top of neuronSegments
+	std::vector<boost::shared_ptr<Segments> > temp_segments;
+	foreach (boost::shared_ptr<Segments> segments, _neuronSegments) {
+		temp_segments.push_back(segments);
+
+	}
+	PairSegmentCreator creator(temp_segments, "/home/akreshuk//thirdparty/sopnet/drosophila-l3/data/stack2/01_classification/median_filtered/synapse_thresholded", 1.0);
+	creator.groupBySynapse();
+
 }
 
 void
