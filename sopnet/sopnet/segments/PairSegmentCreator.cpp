@@ -1,9 +1,8 @@
 #include "PairSegmentCreator.h"
-#include "vigra/transformImage.hxx"
 #include "vigra/impex.hxx"
 
 PairSegmentCreator::PairSegmentCreator(
-		boost::shared_ptr<Segments> segments,
+		std::vector<boost::shared_ptr<Segments> >& segments,
 		std::string prob_map_directory,
 		double distance): _neuron_segments{segments},
 		_pmap_dir{prob_map_directory},
@@ -12,7 +11,7 @@ PairSegmentCreator::PairSegmentCreator(
 		}
 
 PairSegmentCreator::PairSegmentCreator(
-		boost::shared_ptr<Segments> segments,
+		std::vector<boost::shared_ptr<Segments> >& segments,
 		ImageStack& pmap,
 		double distance): _neuron_segments{segments},
 		_pmap{pmap},
@@ -40,7 +39,7 @@ PairSegmentCreator::readPMap() {
 			back_inserter(sorted));
 	std::sort(sorted.begin(), sorted.end());
 
-	LOG_DEBUG(imagestackdirectoryreaderlog) << "directory contains " << sorted.size() << " entries" << std::endl;
+	//LOG_DEBUG(imagestackdirectoryreaderlog) << "directory contains " << sorted.size() << " entries" << std::endl;
 
 	_pmap = ImageStack();
 	// for every image file in the given directory
@@ -48,13 +47,13 @@ PairSegmentCreator::readPMap() {
 
 		if (boost::filesystem::is_regular_file(file)) {
 
-			LOG_INFO(imagestackdirectoryreaderlog) << "creating image for " << file << std::endl;
+			//LOG_INFO(imagestackdirectoryreaderlog) << "creating image for " << file << std::endl;
 
 			//read the files, don't bother with creating the reader for now
-			vigra::ImageImportInfo info(file);
+			vigra::ImageImportInfo info(file.c_str());
 
 			boost::shared_ptr<Image> im = boost::make_shared<Image>(info.width(), info.height());
-			vigra::importImage(info, im);
+			vigra::importImage(info, vigra::destImage(*im));
 			_pmap.add(im);
 
 
@@ -64,7 +63,7 @@ PairSegmentCreator::readPMap() {
 
 void
 PairSegmentCreator::groupBySynapse() {
-	foreach(boost::share_ptr<Image> im, _pmap) {
+	foreach(boost::shared_ptr<Image> im, _pmap) {
 		/*
 		Image bin(im.width(), im.height());
 		vigra::transformImage(im.upperLeft(), im.lowerRight(), im.accessor(),
@@ -72,6 +71,6 @@ PairSegmentCreator::groupBySynapse() {
 		                      vigra::Threshold<Image::PixelType, Image::PixelType>(0.5, 0.5, 0, 1));
         */
 
-		std::cout<<"processed another image "<<im.width()<<" "<<im.height()<<std::endl;
+		std::cout<<"processed another image "<<im->width()<<" "<<im->height()<<std::endl;
 	}
 }
