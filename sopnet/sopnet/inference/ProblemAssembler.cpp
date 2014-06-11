@@ -50,6 +50,7 @@ ProblemAssembler::ProblemAssembler() :
 	registerInputs(_mitochondriaLinearConstraints, "mitochondria linear constraints");
 	registerInputs(_synapseSegments, "synapse segments");
 	registerInputs(_synapseLinearConstraints, "synapse linear constraints");
+    registerInput(_synapseImages, "synapse images");
 
 	registerOutput(_allSegments, "segments");
 	registerOutput(_allNeuronSegments, "neuron segments");
@@ -117,6 +118,7 @@ ProblemAssembler::collectSegments() {
 		temp_segments.push_back(segments);
 
 	}
+	ImageStack& synapseImages = *_synapseImages;
 	PairSegmentCreator creator(temp_segments, "/home/akreshuk//thirdparty/sopnet/drosophila-l3/data/stack2/01_classification/median_filtered/synapse_thresholded", 1.0);
 	creator.groupBySynapse();
 

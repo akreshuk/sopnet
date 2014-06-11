@@ -59,6 +59,9 @@ LinearCostFunction::costs(
 
 	unsigned int i = 0;
 
+
+	//The order of segments really matters, as it implicitly uses
+	//ends-continuations-branchs order of variables in Problem Assembler
 	foreach (boost::shared_ptr<EndSegment> end, ends) {
 
 		double c = costs(*end, weights);

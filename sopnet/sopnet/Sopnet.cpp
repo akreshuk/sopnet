@@ -190,6 +190,9 @@ Sopnet::createBasicPipeline() {
 		}
 	}
 
+	if (_synapseSlices.isSet())
+		_problemAssembler->setInput("synapse images", _synapseSlices);
+
 	if (_groundTruth.isSet())
 		_groundTruthExtractor->setInput(_groundTruth);
 }
