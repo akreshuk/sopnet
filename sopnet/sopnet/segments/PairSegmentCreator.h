@@ -13,8 +13,9 @@
  */
 class PairSegmentCreator {
 public:
-	PairSegmentCreator(std::vector<boost::shared_ptr<Segments> >& segments, std::string prob_map_directory,  double distance);
-	PairSegmentCreator(std::vector<boost::shared_ptr<Segments> >& segments, ImageStack& pmap,  double distance);
+	//PairSegmentCreator(std::vector<boost::shared_ptr<Segments> >& segments, std::string prob_map_directory,  double distance);
+	//PairSegmentCreator(std::vector<boost::shared_ptr<Segments> >& segments, ImageStack& pmap,  double distance);
+	PairSegmentCreator(Segments& segments, ImageStack& pmap_th, double distance);
 
 
 	boost::shared_ptr<std::vector<PairSegment> > getSegments() const;
@@ -27,9 +28,10 @@ private:
 
 
 
-	std::vector<boost::shared_ptr<Segments > >_neuron_segments;
+	//std::vector<boost::shared_ptr<Segments > >_neuron_segments;
+	Segments _neuron_segments;
 	std::string _pmap_dir;
-	ImageStack _pmap;
+	ImageStack _synapse_map;
 	double _distance;
 	std::map<uint32_t, std::vector<boost::shared_ptr<ContinuationSegment> > > _synapseGroups; //segments around a synapse object
 	std::vector<boost::shared_ptr<PairSegment> > _pairs;

@@ -1,6 +1,8 @@
 #include "PairSegmentCreator.h"
 #include "vigra/impex.hxx"
+#include <vigra/multi_array.hxx>
 
+/*
 PairSegmentCreator::PairSegmentCreator(
 		std::vector<boost::shared_ptr<Segments> >& segments,
 		std::string prob_map_directory,
@@ -14,11 +16,20 @@ PairSegmentCreator::PairSegmentCreator(
 		std::vector<boost::shared_ptr<Segments> >& segments,
 		ImageStack& pmap,
 		double distance): _neuron_segments{segments},
-		_pmap{pmap},
+		_synapse_map{pmap},
 		_distance{distance} {}
+*/
 
+PairSegmentCreator::PairSegmentCreator(
+		Segments& segments,
+		ImageStack& syn_map,
+		double distance): _neuron_segments{segments},
+		_synapse_map{syn_map},
+		_distance{distance} {};
+
+/*
 void
-PairSegmentCreator::readPMap() {
+PairSegmentCreator::readSynapseMap() {
 	//FIXME: this has to become a proper pipeline element
 	//Let's think of this later
 	//So far, copied from ImageStackDirectoryReader
@@ -60,17 +71,23 @@ PairSegmentCreator::readPMap() {
 		}
 	}
 }
+*/
+
 
 void
 PairSegmentCreator::groupBySynapse() {
-	foreach(boost::shared_ptr<Image> im, _pmap) {
-		/*
-		Image bin(im.width(), im.height());
-		vigra::transformImage(im.upperLeft(), im.lowerRight(), im.accessor(),
-		                      bin.upperLeft(), bin.accessor(),
-		                      vigra::Threshold<Image::PixelType, Image::PixelType>(0.5, 0.5, 0, 1));
-        */
+	foreach(boost::shared_ptr<Image> im, _synapse_map) {
 
-		std::cout<<"processed another image "<<im->width()<<" "<<im->height()<<std::endl;
+		vigra::MultiArray<2, float> bin(vigra::Shape2(im->width(), im->height()));
+
+		vigra::Threshold<float, float> vthreshold(0.5, 0.5, 0, 1);
+		bin = vthreshold(*im);
+
+		//vigra::transformImage(im->upperLeft(), im->lowerRight(), im->accessor(),
+		 //                     bin.upperLeft(), bin.accessor(),
+		  //                    vigra::Threshold<im::difference_type_1, vigra::Uint8>(0.5, 0.5, 0, 1));
+
+
+		std::cout<<"PAIR SEGMENT CREATOR: processed another image "<<im->width()<<" "<<im->height()<<std::endl;
 	}
 }
