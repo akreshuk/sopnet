@@ -1,3 +1,4 @@
+#include <boost/timer/timer.hpp>
 #include <util/Logger.h>
 #include <util/foreach.h>
 #include "Reconstructor.h"
@@ -5,11 +6,13 @@
 static logger::LogChannel reconstructorlog("reconstructorlog", "[Reconstructor] ");
 
 Reconstructor::Reconstructor() :
-	_reconstruction(new Segments()) {
+	_reconstruction(new Segments()),
+	_discardedSegments(new Segments()) {
 
 	registerInput(_solution, "solution");
 	registerInput(_segments, "segments");
 	registerOutput(_reconstruction, "reconstruction");
+	registerOutput(_discardedSegments, "discarded segments");
 }
 
 void
@@ -23,8 +26,19 @@ Reconstructor::updateOutputs() {
 void
 Reconstructor::updateReconstruction() {
 
+	boost::timer::auto_cpu_timer timer("\tReconstructor::updateReconstruction():\t%ws\n");
+
 	// remove all previous segment in the reconstruction
 	_reconstruction->clear();
+	_reconstruction->setResolution(
+			_segments->getResolutionX(),
+			_segments->getResolutionY(),
+			_segments->getResolutionZ());
+	_discardedSegments->clear();
+	_discardedSegments->setResolution(
+			_segments->getResolutionX(),
+			_segments->getResolutionY(),
+			_segments->getResolutionZ());
 
 	LOG_ALL(reconstructorlog) << "Solution consists of segments: ";
 
@@ -51,6 +65,10 @@ Reconstructor::probe(boost::shared_ptr<SegmentType> segment) {
 		_reconstruction->add(segment);
 
 		LOG_ALL(reconstructorlog) << segment->getId() << " ";
+
+	} else  {
+
+		_discardedSegments->add(segment);
 	}
 
 	_currentSegmentNum++;

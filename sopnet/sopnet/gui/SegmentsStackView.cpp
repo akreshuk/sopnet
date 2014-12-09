@@ -42,6 +42,10 @@ SegmentsStackView::updateOutputs() {
 
 	// query visible segments
 	_painter->getVisibleSegments(*_visibleSegments);
+	_visibleSegments->setResolution(
+			_segments->getResolutionX(),
+			_segments->getResolutionY(),
+			_segments->getResolutionZ());
 
 	LOG_ALL(segmentsstackviewlog) << "there are " << _visibleSegments->size() << " visible segments" << std::endl;
 
@@ -143,14 +147,23 @@ SegmentsStackView::onMouseDown(gui::MouseDown& signal) {
 	if (!_painter->getSize().contains(signal.position))
 		return;
 
-	if (signal.button == gui::buttons::Left)
+	if (signal.button == gui::buttons::Left) {
+
 		_painter->setFocus(signal.position);
+		signal.processed = true;
+	}
 
-	if (signal.button == gui::buttons::WheelDown)
+	if (signal.button == gui::buttons::WheelDown) {
+
 		_painter->nextSegment();
+		signal.processed = true;
+	}
 
-	if (signal.button == gui::buttons::WheelUp)
+	if (signal.button == gui::buttons::WheelUp) {
+
 		_painter->prevSegment();
+		signal.processed = true;
+	}
 
 	setDirty(_painter);
 	setDirty(_visibleSegments);

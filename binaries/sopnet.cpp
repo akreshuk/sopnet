@@ -13,22 +13,21 @@
 #include <util/exceptions.h>
 #include <gui/ContainerView.h>
 #include <gui/HorizontalPlacing.h>
+#include <gui/MeshView.h>
 #include <gui/NamedView.h>
 #include <gui/RotateView.h>
 #include <gui/Window.h>
 #include <gui/ZoomView.h>
 #include <inference/io/RandomForestHdf5Writer.h>
-#include <imageprocessing/ImageExtractor.h>
 #include <imageprocessing/SubStackSelector.h>
-#include <imageprocessing/gui/ImageView.h>
 #include <imageprocessing/gui/ImageStackView.h>
 #include <imageprocessing/io/ImageStackHdf5Reader.h>
 #include <imageprocessing/io/ImageStackDirectoryReader.h>
 #include <sopnet/Sopnet.h>
-#include <sopnet/evaluation/ResultEvaluator.h>
-#include <sopnet/evaluation/VariationOfInformation.h>
+#include <sopnet/evaluation/ErrorReport.h>
 #include <sopnet/gui/ErrorsView.h>
 #include <sopnet/gui/FeaturesView.h>
+#include <sopnet/gui/NeuronsMeshExtractor.h>
 #include <sopnet/gui/NeuronsView.h>
 #include <sopnet/gui/NeuronsStackView.h>
 #include <sopnet/gui/SegmentsView.h>
@@ -63,6 +62,14 @@ util::ProgramOption optionTraining(
 		_long_name        = "train",
 		_short_name       = "t",
 		_description_text = "Train the segment random forest classifier.");
+
+util::ProgramOption optionWriteStructuredProblem(
+		_long_name        = "writeStructuredProblem",
+		_description_text = "Dump the gold standard, all features and constraints for structured learning.");
+
+util::ProgramOption optionWriteMinimalImpactTED(
+		_long_name	  = "writeMinimalImpactTED",
+		_description_text = "Dump coefficients for minimal impact TED for structured learning.");
 
 util::ProgramOption optionFirstSection(
 		_module           = "sopnet",
@@ -137,6 +144,18 @@ util::ProgramOption optionGridSearch(
 		_long_name        = "gridSearch",
 		_description_text = "Preform a grid search.");
 
+util::ProgramOption optionForceExplanation(
+		util::_module           = "sopnet.inference",
+		util::_long_name        = "forceExplanation",
+		util::_description_text = "Force the solver to explain every segmentation hypotheses, i.e., that in every maximal "
+		                          "set of conflicting slices exactly one gets chosen. This usually results in a denser "
+		                          "reconstruction. This works only for slice hypotheses coming from a component tree, which "
+		                          "means it cannot be combined with 'slicesFromStacks'.");
+
+util::ProgramOption optionHeadless(
+		_long_name        = "headless",
+		_description_text = "Despite other options that suggest a GUI (like showErrors), do not start the GUI.");
+
 void processEvents(boost::shared_ptr<gui::Window>& window) {
 
 	LOG_USER(out) << " started as " << window->getCaption() << " at " << window.get() << std::endl;
@@ -183,39 +202,53 @@ int main(int optionc, char** optionv) {
 
 		LOG_USER(out) << "[main] starting..." << std::endl;
 
-		int firstSection = optionFirstSection;
+		int firstSection = std::max(0,optionFirstSection.as<int>());
 		int lastSection  = optionLastSection;
+		SliceHashConfiguration::sectionOffset = firstSection;
 
 		/*********
 		 * SETUP *
 		 *********/
 
-		// create a window
-		resultWindow  = boost::make_shared<gui::Window>("sopnet: results");
-		controlWindow = boost::make_shared<gui::Window>("sopnet: controls");
+		// GUI elements
+		boost::shared_ptr<gui::ZoomView> resultZoomView;
+		boost::shared_ptr<gui::ZoomView> controlZoomView;
+		boost::shared_ptr<ContainerView<VerticalPlacing> >   resultContainer;
+		boost::shared_ptr<ContainerView<VerticalPlacing> >   controlContainer;
+		boost::shared_ptr<ContainerView<HorizontalPlacing> > imageStackContainer;
+		boost::shared_ptr<ContainerView<HorizontalPlacing> > segmentsContainer;
+		boost::shared_ptr<SopnetDialog> sopnetDialog;
 
-		// create a zoom view for this window
-		boost::shared_ptr<gui::ZoomView> resultZoomView  = boost::make_shared<gui::ZoomView>(true);
-		boost::shared_ptr<gui::ZoomView> controlZoomView = boost::make_shared<gui::ZoomView>(true);
-		resultWindow->setInput(resultZoomView->getOutput());
-		controlWindow->setInput(controlZoomView->getOutput());
+		if (!optionHeadless) {
 
-		// create two rows of views
-		boost::shared_ptr<ContainerView<VerticalPlacing> >   resultContainer     = boost::make_shared<ContainerView<VerticalPlacing> >("results");
-		boost::shared_ptr<ContainerView<VerticalPlacing> >   controlContainer    = boost::make_shared<ContainerView<VerticalPlacing> >("controls");
-		boost::shared_ptr<ContainerView<HorizontalPlacing> > imageStackContainer = boost::make_shared<ContainerView<HorizontalPlacing> >("image stacks");
-		boost::shared_ptr<ContainerView<HorizontalPlacing> > segmentsContainer   = boost::make_shared<ContainerView<HorizontalPlacing> >("segments");
+			// create windows
+			resultWindow  = boost::make_shared<gui::Window>("sopnet: results");
+			controlWindow = boost::make_shared<gui::Window>("sopnet: controls");
 
-		// create sopnet dialog
-		boost::shared_ptr<SopnetDialog> sopnetDialog = boost::make_shared<SopnetDialog>();
+			// create a zoom view for this window
+			resultZoomView  = boost::make_shared<gui::ZoomView>(true);
+			controlZoomView = boost::make_shared<gui::ZoomView>(true);
 
-		// connect them to the window via the zoom view
-		controlContainer->setAlign(VerticalPlacing::Left);
-		controlContainer->addInput(imageStackContainer->getOutput());
-		controlContainer->addInput(sopnetDialog->getOutput("painter"));
-		controlZoomView->setInput(controlContainer->getOutput());
-		resultContainer->addInput(segmentsContainer->getOutput());
-		resultZoomView->setInput(resultContainer->getOutput());
+			resultWindow->setInput(resultZoomView->getOutput());
+			controlWindow->setInput(controlZoomView->getOutput());
+
+			// create two rows of views
+			resultContainer     = boost::make_shared<ContainerView<VerticalPlacing> >("results");
+			controlContainer    = boost::make_shared<ContainerView<VerticalPlacing> >("controls");
+			imageStackContainer = boost::make_shared<ContainerView<HorizontalPlacing> >("image stacks");
+			segmentsContainer   = boost::make_shared<ContainerView<HorizontalPlacing> >("segments");
+
+			// create sopnet dialog
+			sopnetDialog = boost::make_shared<SopnetDialog>(optionForceExplanation.as<bool>());
+
+			// connect them to the window via the zoom view
+			controlContainer->setAlign(VerticalPlacing::Left);
+			controlContainer->addInput(imageStackContainer->getOutput());
+			controlContainer->addInput(sopnetDialog->getOutput("painter"));
+			controlZoomView->setInput(controlContainer->getOutput());
+			resultContainer->addInput(segmentsContainer->getOutput());
+			resultZoomView->setInput(resultContainer->getOutput());
+		}
 
 		// create section readers
 		boost::shared_ptr<pipeline::ProcessNode> rawSectionsReader;
@@ -350,32 +383,16 @@ int main(int optionc, char** optionv) {
 			}
 		}
 
-		// create basic views
-		boost::shared_ptr<ImageStackView> rawSectionsView = boost::make_shared<ImageStackView>();
-		boost::shared_ptr<ImageStackView> membranesView   = boost::make_shared<ImageStackView>();
-		boost::shared_ptr<ImageStackView> slicesView      = boost::make_shared<ImageStackView>();
-		boost::shared_ptr<ImageStackView> groundTruthView = boost::make_shared<ImageStackView>();
-
-		// fill first row
-		imageStackContainer->addInput(rawSectionsView->getOutput());
-		imageStackContainer->addInput(membranesView->getOutput());
-		imageStackContainer->addInput(slicesView->getOutput());
-		if (groundTruthReader)
-			imageStackContainer->addInput(groundTruthView->getOutput());
-
-		// set input for image stack views
-		rawSectionsView->setInput(rawSectionsReader->getOutput());
-		membranesView->setInput(membranesReader->getOutput());
-		slicesView->setInput(slicesReader->getOutput());
-		if (groundTruthReader)
-			groundTruthView->setInput(groundTruthReader->getOutput());
-
 		// create sopnet pipeline
 		boost::shared_ptr<Sopnet> sopnet = boost::make_shared<Sopnet>("projects dir not yet implemented");
 
 		// set input to sopnet pipeline
 		sopnet->setInput("raw sections", rawSectionsReader->getOutput());
 		sopnet->setInput("membranes", membranesReader->getOutput());
+		sopnet->setInput("segmentation cost parameters", boost::make_shared<SegmentationCostFunctionParameters>());
+		sopnet->setInput("prior cost parameters", boost::make_shared<PriorCostFunctionParameters>());
+		pipeline::Value<bool> forceExplanation = optionForceExplanation.as<bool>();
+		sopnet->setInput("force explanation", forceExplanation);
 		if (optionSlicesFromStacks)
 			sopnet->setInput("neuron slice stack directories", sliceStackDirectories);
 		else
@@ -386,24 +403,24 @@ int main(int optionc, char** optionv) {
 			sopnet->setInput("synapse slices", synapseReader->getOutput());
 		if (groundTruthReader)
 			sopnet->setInput("ground truth", groundTruthReader->getOutput());
-		else if (optionTraining) {
+		else if (optionTraining || optionWriteStructuredProblem) {
 
 			LOG_ERROR(out) << "trainig requested, but no ground-truth found!" << std::endl;
 			return -1;
 		}
-		sopnet->setInput("segmentation cost parameters", sopnetDialog->getOutput("segmentation cost parameters"));
-		sopnet->setInput("prior cost parameters", sopnetDialog->getOutput("prior cost parameters"));
-		sopnet->setInput("force explanation", sopnetDialog->getOutput("force explanation"));
 
 		// create result evaluator and variation of information if needed by 
 		// anyone
-		boost::shared_ptr<ResultEvaluator>        resultEvaluator;
-		boost::shared_ptr<VariationOfInformation> variationOfInformation;
+		boost::shared_ptr<ErrorReport>            errorReport;
 
 		if (optionShowErrors || optionGridSearch) {
 
-			resultEvaluator        = boost::make_shared<ResultEvaluator>();
-			variationOfInformation = boost::make_shared<VariationOfInformation>();
+			errorReport = boost::make_shared<ErrorReport>();
+
+			errorReport->setInput("ground truth", groundTruthReader->getOutput());
+			errorReport->setInput("ground truth segments", sopnet->getOutput("ground truth segments"));
+			errorReport->setInput("gold standard segments", sopnet->getOutput("gold standard"));
+			errorReport->setInput("reconstruction segments", sopnet->getOutput("solution"));
 		}
 
 		// create a neuron extractor
@@ -413,7 +430,7 @@ int main(int optionc, char** optionv) {
 		// create a result id map creator if needed
 		boost::shared_ptr<IdMapCreator> resultIdMapCreator;
 
-		if (optionShowErrors || optionSaveResultDirectory) {
+		if (optionShowErrors || optionSaveResultDirectory || optionGridSearch) {
 
 			resultIdMapCreator = boost::make_shared<IdMapCreator>();
 
@@ -421,156 +438,214 @@ int main(int optionc, char** optionv) {
 			resultIdMapCreator->setInput("reference", rawSectionsReader->getOutput());
 		}
 
-		if (optionShowAllSegments) {
+		if (!optionHeadless) {
 
-			boost::shared_ptr<ContainerView<HorizontalPlacing> > container    = boost::make_shared<ContainerView<HorizontalPlacing> >("all segments");
-			boost::shared_ptr<ContainerView<OverlayPlacing> >    overlay      = boost::make_shared<ContainerView<OverlayPlacing> >("stack view");
-			boost::shared_ptr<ImageStackView>                    sectionsView = boost::make_shared<ImageStackView>(3, 5.0);
-			boost::shared_ptr<SegmentsStackView>                 stackView    = boost::make_shared<SegmentsStackView>(5.0);
-			boost::shared_ptr<SegmentsView>                      segmentsView = boost::make_shared<SegmentsView>("single segment");
-			boost::shared_ptr<RotateView>                        rotateView   = boost::make_shared<RotateView>();
-			boost::shared_ptr<NamedView>                         namedView    = boost::make_shared<NamedView>("All Segments:");
+			// create basic views
+			boost::shared_ptr<ImageStackView> rawSectionsView = boost::make_shared<ImageStackView>();
+			boost::shared_ptr<ImageStackView> membranesView   = boost::make_shared<ImageStackView>();
+			boost::shared_ptr<ImageStackView> slicesView      = boost::make_shared<ImageStackView>();
+			boost::shared_ptr<ImageStackView> groundTruthView = boost::make_shared<ImageStackView>();
 
-			stackView->setInput(sopnet->getOutput("segments"));
-			sectionsView->setInput(rawSectionsReader->getOutput());
-			overlay->addInput(stackView->getOutput("painter"));
-			overlay->addInput(sectionsView->getOutput());
+			// fill first row
+			imageStackContainer->addInput(rawSectionsView->getOutput());
+			imageStackContainer->addInput(membranesView->getOutput());
+			imageStackContainer->addInput(slicesView->getOutput());
+			if (groundTruthReader)
+				imageStackContainer->addInput(groundTruthView->getOutput());
 
-			segmentsView->setInput(stackView->getOutput("visible segments"));
-			rotateView->setInput(segmentsView->getOutput());
+			// set input for image stack views
+			rawSectionsView->setInput(rawSectionsReader->getOutput());
+			membranesView->setInput(membranesReader->getOutput());
+			slicesView->setInput(slicesReader->getOutput());
+			if (groundTruthReader)
+				groundTruthView->setInput(groundTruthReader->getOutput());
 
-			container->addInput(overlay->getOutput());
-			if (optionShowSegmentFeatures) {
+			sopnet->setInput("segmentation cost parameters", sopnetDialog->getOutput("segmentation cost parameters"));
+			sopnet->setInput("prior cost parameters", sopnetDialog->getOutput("prior cost parameters"));
+			sopnet->setInput("force explanation", sopnetDialog->getOutput("force explanation"));
 
-				boost::shared_ptr<FeaturesView> featuresView = boost::make_shared<FeaturesView>();
-				featuresView->setInput("segments", stackView->getOutput("visible segments"));
-				featuresView->setInput("features", sopnet->getOutput("all features"));
-				featuresView->setInput("problem configuration", sopnet->getOutput("problem configuration"));
-				featuresView->setInput("objective", sopnet->getOutput("objective"));
-				container->addInput(featuresView->getOutput());
+			if (optionShowAllSegments) {
 
-				if (optionShowGroundTruth)
-					featuresView->setInput("ground truth score", sopnet->getOutput("ground truth score"));
+				boost::shared_ptr<ContainerView<HorizontalPlacing> > container    = boost::make_shared<ContainerView<HorizontalPlacing> >("all segments");
+				boost::shared_ptr<ContainerView<OverlayPlacing> >    overlay      = boost::make_shared<ContainerView<OverlayPlacing> >("stack view");
+				boost::shared_ptr<ImageStackView>                    sectionsView = boost::make_shared<ImageStackView>(3, 5.0);
+				boost::shared_ptr<SegmentsStackView>                 stackView    = boost::make_shared<SegmentsStackView>(5.0);
+				boost::shared_ptr<SegmentsView>                      segmentsView = boost::make_shared<SegmentsView>("single segment");
+				boost::shared_ptr<RotateView>                        rotateView   = boost::make_shared<RotateView>();
+				boost::shared_ptr<NamedView>                         namedView    = boost::make_shared<NamedView>("All Segments:");
+
+				stackView->setInput(sopnet->getOutput("segments"));
+				sectionsView->setInput(rawSectionsReader->getOutput());
+				overlay->addInput(stackView->getOutput("painter"));
+				overlay->addInput(sectionsView->getOutput());
+
+				segmentsView->setInput(stackView->getOutput("visible segments"));
+				rotateView->setInput(segmentsView->getOutput());
+
+				container->addInput(overlay->getOutput());
+
+				if (optionShowSegmentFeatures) {
+
+					boost::shared_ptr<FeaturesView> featuresView = boost::make_shared<FeaturesView>();
+					featuresView->setInput("segments", stackView->getOutput("visible segments"));
+					featuresView->setInput("features", sopnet->getOutput("all features"));
+					featuresView->setInput("problem configuration", sopnet->getOutput("problem configuration"));
+					featuresView->setInput("objective", sopnet->getOutput("objective"));
+
+					if (optionShowGoldStandard)
+						featuresView->setInput("ground truth score", sopnet->getOutput("gold standard objective"));
+
+					container->addInput(featuresView->getOutput());
+				}
+
+				container->addInput(rotateView->getOutput());
+
+				namedView->setInput(container->getOutput());
+
+				controlContainer->addInput(namedView->getOutput());
 			}
-			container->addInput(rotateView->getOutput());
 
-			namedView->setInput(container->getOutput());
+			boost::shared_ptr<NeuronsStackView> resultView;
 
-			controlContainer->addInput(namedView->getOutput());
-		}
+			if (optionShowResult) {
 
-		boost::shared_ptr<NeuronsStackView> resultView;
+				resultView = boost::make_shared<NeuronsStackView>();
 
-		if (optionShowResult) {
+				boost::shared_ptr<ContainerView<OverlayPlacing> > overlay      = boost::make_shared<ContainerView<OverlayPlacing> >("result");
+				boost::shared_ptr<ImageStackView>                 sectionsView = boost::make_shared<ImageStackView>();
+				boost::shared_ptr<NamedView>                      namedView    = boost::make_shared<NamedView>("Result:");
 
-			resultView = boost::make_shared<NeuronsStackView>();
+				resultView->setInput(neuronExtractor->getOutput("neurons"));
+				sectionsView->setInput(rawSectionsReader->getOutput());
+				overlay->addInput(resultView->getOutput());
+				overlay->addInput(sectionsView->getOutput());
+				namedView->setInput(overlay->getOutput());
 
-			boost::shared_ptr<ContainerView<OverlayPlacing> > overlay      = boost::make_shared<ContainerView<OverlayPlacing> >("result");
-			boost::shared_ptr<ImageStackView>                 sectionsView = boost::make_shared<ImageStackView>();
-			boost::shared_ptr<NamedView>                      namedView    = boost::make_shared<NamedView>("Result:");
+				segmentsContainer->addInput(namedView->getOutput());
+			}
 
-			resultView->setInput(neuronExtractor->getOutput("neurons"));
-			sectionsView->setInput(rawSectionsReader->getOutput());
-			overlay->addInput(resultView->getOutput());
-			overlay->addInput(sectionsView->getOutput());
-			namedView->setInput(overlay->getOutput());
+			if (optionShowResult3d) {
 
-			segmentsContainer->addInput(namedView->getOutput());
-		}
+				boost::shared_ptr<NeuronsMeshExtractor> meshExtractor = boost::make_shared<NeuronsMeshExtractor>();
+				boost::shared_ptr<MeshView>             result3DView  = boost::make_shared<MeshView>();
+				boost::shared_ptr<RotateView>           rotateView    = boost::make_shared<RotateView>();
+				boost::shared_ptr<NamedView>            namedView     = boost::make_shared<NamedView>("Result:");
 
-		if (optionShowResult3d) {
+				meshExtractor->setInput(resultView->getOutput("selection"));
+				result3DView->setInput(meshExtractor->getOutput());
+				rotateView->setInput(result3DView->getOutput());
+				namedView->setInput(rotateView->getOutput());
 
-			boost::shared_ptr<SegmentsView> resultView   = boost::make_shared<SegmentsView>("result");
-			boost::shared_ptr<RotateView>   rotateView   = boost::make_shared<RotateView>();
-			boost::shared_ptr<NamedView>    namedView    = boost::make_shared<NamedView>("Result:");
+				segmentsContainer->addInput(namedView->getOutput());
+			}
 
-			if (optionShowErrors)
-				resultView->setInput("slice errors", resultEvaluator->getOutput());
+			if (optionShowGroundTruth) {
 
-			resultView->setInput(sopnet->getOutput("solution"));
-			rotateView->setInput(resultView->getOutput());
-			namedView->setInput(rotateView->getOutput());
+				boost::shared_ptr<NeuronExtractor>  gtNeuronExtractor = boost::make_shared<NeuronExtractor>();
+				boost::shared_ptr<NeuronsStackView> groundTruthView   = boost::make_shared<NeuronsStackView>();
+				boost::shared_ptr<NamedView>        namedView         = boost::make_shared<NamedView>("Ground-truth:");
 
-			segmentsContainer->addInput(namedView->getOutput());
-		}
+				gtNeuronExtractor->setInput(sopnet->getOutput("ground truth segments"));
+				groundTruthView->setInput(gtNeuronExtractor->getOutput());
+				namedView->setInput(groundTruthView->getOutput());
 
-		if (optionShowGroundTruth) {
+				segmentsContainer->addInput(namedView->getOutput());
+			}
 
-			boost::shared_ptr<SegmentsView> groundTruthView = boost::make_shared<SegmentsView>("ground truth");
-			boost::shared_ptr<RotateView>   gtRotateView    = boost::make_shared<RotateView>();
-			boost::shared_ptr<NamedView>    namedView       = boost::make_shared<NamedView>("Ground-truth:");
+			boost::shared_ptr<NeuronExtractor> gsNeuronExtractor;
 
-			if (optionShowErrors)
-				groundTruthView->setInput("slice errors", resultEvaluator->getOutput());
+			if (optionShowGoldStandard) {
 
-			groundTruthView->setInput(sopnet->getOutput("ground truth segments"));
-			groundTruthView->setInput("raw sections", rawSectionsReader->getOutput());
-			gtRotateView->setInput(groundTruthView->getOutput());
-			namedView->setInput(gtRotateView->getOutput());
+				boost::shared_ptr<NeuronsStackView>               goldstandardView = boost::make_shared<NeuronsStackView>();
+				boost::shared_ptr<ImageStackView>                 sectionsView     = boost::make_shared<ImageStackView>();
+				boost::shared_ptr<ContainerView<OverlayPlacing> > overlay          = boost::make_shared<ContainerView<OverlayPlacing> >("result");
+				boost::shared_ptr<NamedView>                      namedView        = boost::make_shared<NamedView>("Gold Standard:");
 
-			segmentsContainer->addInput(namedView->getOutput());
-		}
+				gsNeuronExtractor = boost::make_shared<NeuronExtractor>();
+				gsNeuronExtractor->setInput("segments", sopnet->getOutput("gold standard"));
 
-		if (optionShowGoldStandard) {
+				goldstandardView->setInput(gsNeuronExtractor->getOutput());
+				sectionsView->setInput(rawSectionsReader->getOutput());
+				overlay->addInput(goldstandardView->getOutput());
+				overlay->addInput(sectionsView->getOutput());
+				namedView->setInput(overlay->getOutput());
 
-			boost::shared_ptr<SegmentsView> goldstandardView = boost::make_shared<SegmentsView>("gold standard");
-			boost::shared_ptr<RotateView>   gsRotateView     = boost::make_shared<RotateView>();
-			boost::shared_ptr<NamedView>    namedView        = boost::make_shared<NamedView>("Gold Standard:");
+				segmentsContainer->addInput(namedView->getOutput());
+			}
 
-			goldstandardView->setInput(sopnet->getOutput("gold standard"));
-			goldstandardView->setInput("raw sections", rawSectionsReader->getOutput());
-			gsRotateView->setInput(goldstandardView->getOutput());
-			namedView->setInput(gsRotateView->getOutput());
+			if (optionShowNegativeSamples) {
 
-			segmentsContainer->addInput(namedView->getOutput());
-		}
+				boost::shared_ptr<SegmentsView> negativeView = boost::make_shared<SegmentsView>("negative samples");
+				boost::shared_ptr<RotateView>   neRotateView = boost::make_shared<RotateView>();
+				boost::shared_ptr<NamedView>    namedView    = boost::make_shared<NamedView>("Negative Samples:");
 
-		if (optionShowNegativeSamples) {
+				negativeView->setInput(sopnet->getOutput("negative samples"));
+				negativeView->setInput("raw sections", rawSectionsReader->getOutput());
+				neRotateView->setInput(negativeView->getOutput());
+				namedView->setInput(neRotateView->getOutput());
 
-			boost::shared_ptr<SegmentsView> negativeView = boost::make_shared<SegmentsView>("negative samples");
-			boost::shared_ptr<RotateView>   neRotateView = boost::make_shared<RotateView>();
-			boost::shared_ptr<NamedView>    namedView    = boost::make_shared<NamedView>("Negative Samples:");
+				segmentsContainer->addInput(namedView->getOutput());
+			}
 
-			negativeView->setInput(sopnet->getOutput("negative samples"));
-			negativeView->setInput("raw sections", rawSectionsReader->getOutput());
-			neRotateView->setInput(negativeView->getOutput());
-			namedView->setInput(neRotateView->getOutput());
+			if (optionShowNeurons) {
 
-			segmentsContainer->addInput(namedView->getOutput());
-		}
+				boost::shared_ptr<NeuronsView> neuronsView = boost::make_shared<NeuronsView>();
+				boost::shared_ptr<NamedView>   namedView   = boost::make_shared<NamedView>("Found Neurons:");
 
-		if (optionShowNeurons) {
+				neuronsView->setInput(neuronExtractor->getOutput());
+				if (optionShowErrors)
+					neuronsView->setInput("aed errors", errorReport->getOutput("aed errors"));
+				namedView->setInput(neuronsView->getOutput());
 
-			boost::shared_ptr<NeuronsView> neuronsView = boost::make_shared<NeuronsView>();
-			boost::shared_ptr<NamedView>   namedView   = boost::make_shared<NamedView>("Found Neurons:");
+				controlContainer->addInput(namedView->getOutput());
 
-			neuronsView->setInput(neuronExtractor->getOutput());
-			if (optionShowErrors)
-				neuronsView->setInput("slice errors", resultEvaluator->getOutput());
-			namedView->setInput(neuronsView->getOutput());
+				if (resultView)
+					resultView->setInput("current neuron", neuronsView->getOutput("current neuron"));
+			}
 
-			controlContainer->addInput(namedView->getOutput());
+			if (optionShowErrors && groundTruthReader) {
 
-			if (resultView)
-				resultView->setInput("current neuron", neuronsView->getOutput("current neuron"));
-		}
+				if (optionShowResult) {
 
-		if (optionShowErrors && groundTruthReader) {
+					boost::shared_ptr<ErrorsView> errorsView = boost::make_shared<ErrorsView>();
+					boost::shared_ptr<NamedView>  namedView  = boost::make_shared<NamedView>("Errors:");
 
-			boost::shared_ptr<ErrorsView> errorsView = boost::make_shared<ErrorsView>();
-			boost::shared_ptr<NamedView>  namedView  = boost::make_shared<NamedView>("Errors:");
+					errorsView->setInput("error report", errorReport->getOutput("human readable error report"));
+					namedView->setInput(errorsView->getOutput());
 
-			resultEvaluator->setInput("result", sopnet->getOutput("solution"));
-			resultEvaluator->setInput("ground truth", sopnet->getOutput("ground truth segments"));
+					resultContainer->addInput(namedView->getOutput());
+				}
 
-			variationOfInformation->setInput("stack 1", groundTruthReader->getOutput());
-			variationOfInformation->setInput("stack 2", resultIdMapCreator->getOutput());
+				if (optionShowGoldStandard) {
 
-			errorsView->setInput("slice errors", resultEvaluator->getOutput());
-			errorsView->setInput("variation of information", variationOfInformation->getOutput());
-			namedView->setInput(errorsView->getOutput());
+					// gold standard error
+					pipeline::Process<NamedView>   goldStandardNamedView("Error bounds with current hypotheses:");
+					pipeline::Process<ErrorReport> goldStandardErrorReport;
+					pipeline::Process<ErrorsView>  goldStandardErrorsView;
 
-			resultContainer->addInput(namedView->getOutput());
+					goldStandardErrorReport->setInput("ground truth", groundTruthReader->getOutput());
+					goldStandardErrorReport->setInput("ground truth segments", sopnet->getOutput("ground truth segments"));
+					goldStandardErrorReport->setInput("gold standard segments", sopnet->getOutput("gold standard"));
+					goldStandardErrorReport->setInput("reconstruction segments", sopnet->getOutput("gold standard"));
+
+					goldStandardErrorsView->setInput("error report", goldStandardErrorReport->getOutput("human readable error report"));
+					goldStandardNamedView->setInput(goldStandardErrorsView->getOutput());
+
+					resultContainer->addInput(goldStandardNamedView->getOutput());
+				}
+			}
+		} // !optionHeadless
+
+		if (optionHeadless && optionShowErrors && groundTruthReader && !optionGridSearch) {
+
+			// Compute errors even if headless is on
+			LOG_USER(out) << "Computing HEADLESS ERRORS:" << std::endl;
+
+			pipeline::Value<std::string> reportHeader = errorReport->getOutput("error report header");
+			pipeline::Value<std::string> reportLine = errorReport->getOutput("error report");
+
+			LOG_USER(out) << *reportHeader << std::endl;
+			LOG_USER(out) << *reportLine   << std::endl;
 		}
 
 		if (optionTraining) {
@@ -583,62 +658,79 @@ int main(int optionc, char** optionv) {
 			LOG_USER(out) << "[main] training finished!" << std::endl;
 		}
 
-		if (optionSaveResultDirectory) {
+		if (optionWriteStructuredProblem) {
 
-			if (optionGridSearch) {
+			sopnet->writeStructuredProblem("./labels.txt", "./features.txt", "./constraints.txt");
 
-				LOG_USER(out) << "[main] performing grid search" << std::endl;
-
-				boost::shared_ptr<GridSearch> gridSearch = boost::make_shared<GridSearch>();
-
-				sopnet->setInput("prior cost parameters", gridSearch->getOutput("prior cost parameters"));
-				sopnet->setInput("segmentation cost parameters", gridSearch->getOutput("segmentation cost parameters"));
-
-				while (true) {
-
-					std::string parameterString = gridSearch->currentParameters();
-
-					LOG_USER(out) << "[main] performing grid search with " << parameterString << std::endl;
-
-					boost::shared_ptr<IdMapCreator>       gridResultIdMapCreator = boost::make_shared<IdMapCreator>();
-					boost::shared_ptr<NeuronsImageWriter> gridResultWriter       = boost::make_shared<NeuronsImageWriter>(optionSaveResultDirectory.as<std::string>() + "/" + parameterString, optionSaveResultBasename);
-
-					gridResultIdMapCreator->setInput("neurons", neuronExtractor->getOutput());
-					gridResultIdMapCreator->setInput("reference", rawSectionsReader->getOutput());
-
-					gridResultWriter->setInput("id map", gridResultIdMapCreator->getOutput("id map"));
-					gridResultWriter->setInput("annotation", variationOfInformation->getOutput());
-					gridResultWriter->write();
-
-					if (!gridSearch->next())
-						break;
-				}
-
-				LOG_USER(out) << "[main] grid search done." << std::endl;
-
-			} else {
-
-				LOG_USER(out) << "[main] writing solution to directory " << optionSaveResultDirectory.as<std::string>() << std::endl;
-
-				boost::shared_ptr<NeuronsImageWriter> resultWriter =
-						boost::make_shared<NeuronsImageWriter>(
-								optionSaveResultDirectory,
-								optionSaveResultBasename,
-								optionFirstSection);
-
-				resultWriter->setInput(resultIdMapCreator->getOutput("id map"));
-				resultWriter->write();
-			}
+			LOG_USER(out) << "[main] files for structured learning written!" << std::endl;
 		}
 
-		boost::thread controlThread(boost::bind(&processEvents, controlWindow));
-		boost::thread resultThread(boost::bind(&processEvents, resultWindow));
+		if (optionWriteMinimalImpactTED) {
+			
+			sopnet->writeMinimalImpactTEDCoefficients("./minimalImpactTEDcoefficients.txt");
 
-		resultThread.join();
-		controlThread.join();
+			LOG_USER(out) << "[main] file for minimal impact TED written!" << std::endl;
+		}
 
-		resultWindow->close();
-		resultThread.join();
+		if (optionGridSearch) {
+
+			LOG_USER(out) << "[main] performing grid search" << std::endl;
+
+			boost::shared_ptr<GridSearch> gridSearch = boost::make_shared<GridSearch>();
+
+			sopnet->setInput("prior cost parameters", gridSearch->getOutput("prior cost parameters"));
+			sopnet->setInput("segmentation cost parameters", gridSearch->getOutput("segmentation cost parameters"));
+
+			pipeline::Value<std::string> reportHeader = errorReport->getOutput("error report header");
+			pipeline::Value<std::string> reportLine   = errorReport->getOutput("error report");
+
+			// open file for grid search results
+			std::ofstream gridSearchFile("grid_search.txt");
+			gridSearchFile
+					<< "# end\tcont\tbranch\tseg_w\tseg_p\tseg_f:\t"
+					<< *reportHeader << std::endl;
+
+			while (true) {
+
+				std::string parameterString = gridSearch->currentParameters();
+
+				LOG_USER(out) << "[main] performing grid search with " << parameterString << std::endl;
+
+				gridSearchFile << parameterString << "\t" << *reportLine << std::endl;
+
+				if (!gridSearch->next())
+					break;
+			}
+
+			LOG_USER(out) << "[main] grid search done." << std::endl;
+		}
+
+		if (optionSaveResultDirectory) {
+
+			LOG_USER(out) << "[main] writing solution to directory " << optionSaveResultDirectory.as<std::string>() << std::endl;
+
+			boost::shared_ptr<NeuronsImageWriter> resultWriter =
+					boost::make_shared<NeuronsImageWriter>(
+							optionSaveResultDirectory,
+							optionSaveResultBasename,
+							optionFirstSection);
+
+			resultWriter->setInput(resultIdMapCreator->getOutput("id map"));
+			resultWriter->write();
+		}
+
+		// finally, show the windows
+		if (!optionHeadless) {
+
+			boost::thread controlThread(boost::bind(&processEvents, controlWindow));
+			boost::thread resultThread(boost::bind(&processEvents, resultWindow));
+
+			resultThread.join();
+			controlThread.join();
+
+			resultWindow->close();
+			resultThread.join();
+		}
 
 		LOG_USER(out) << "[main] exiting..." << std::endl;
 

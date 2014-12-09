@@ -7,16 +7,14 @@
 
 #include <pipeline/all.h>
 #include <inference/LinearConstraints.h>
-#include <imageprocessing/ComponentTree.h>
-#include <imageprocessing/MserParameters.h>
+#include <imageprocessing/ComponentTreeExtractor.h>
 #include "Slices.h"
 
 // forward declaration
 class ComponentTreeDownSampler;
 class ComponentTreePruner;
 class ComponentTreeConverter;
-template <typename Precision> class Mser;
-class MserParameters;
+template <typename Precision> class ComponentTreeExtractor;
 
 template <typename Precision>
 class SliceExtractor : public pipeline::ProcessNode {
@@ -29,23 +27,26 @@ public:
 	 * @param section
 	 *              The section number that the extracted slices will have.
 	 *
+	 * @param resX, resY, resZ
+	 *              The resolution of the image stack used to extract slices.
+	 *
 	 * @param downsample
 	 *              Do not extract slices that are single children of their 
 	 *              parents in the component tree.
 	 */
-	SliceExtractor(unsigned int section, bool downsample);
+	SliceExtractor(unsigned int section, float resX, float resY, float resZ, bool downsample);
 
 private:
 
 	void onInputSet(const pipeline::InputSetBase& signal);
 
-	// optional mser parameters to override the program options
-	pipeline::Input<MserParameters> _mserParameters;
+	// optional cte parameters to override the program options
+	pipeline::Input<ComponentTreeExtractorParameters> _cteParameters;
 
 	void extractSlices();
 
-	boost::shared_ptr<Mser<Precision> >         _mser;
-	boost::shared_ptr<MserParameters>           _defaultMserParameters;
+	boost::shared_ptr<ComponentTreeExtractor<Precision> > _cte;
+	boost::shared_ptr<ComponentTreeExtractorParameters>   _defaultCteParameters;
 	boost::shared_ptr<ComponentTreeDownSampler> _downSampler;
 	boost::shared_ptr<ComponentTreePruner>      _pruner;
 	boost::shared_ptr<ComponentTreeConverter>   _converter;

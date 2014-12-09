@@ -3,13 +3,16 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <imageprocessing/DiscreteVolume.h>
 #include <util/ProgramOptions.h>
 #include <util/rect.hpp>
+#include <util/Hashable.h>
+#include "SliceHash.h"
 
 // forward declaration
 class ConnectedComponent;
 
-class Slice {
+class Slice : public DiscreteVolume, public Hashable<Slice, SliceHash> {
 
 public:
 
@@ -45,7 +48,7 @@ public:
 	 * a single connected component any longer.
 	 */
 	void intersect(const Slice& other);
-
+	
 	/**
 	 * Translate this Slice
 	 * @param pt a point representing the translation to perform.
@@ -53,6 +56,13 @@ public:
 	void translate(const util::point<int>& pt);
 
 	bool operator==(const Slice& other) const;
+
+protected:
+
+	/**
+	 * Overwritten from Volume.
+	 */
+	BoundingBox computeBoundingBox() const;
 
 private:
 

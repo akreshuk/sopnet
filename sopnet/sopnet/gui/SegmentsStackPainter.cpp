@@ -99,11 +99,17 @@ SegmentsStackPainter::setFocus(const util::point<double>& focus) {
 	// get closest segments to focus
 
 	// create a dummy pixel list with only the focus point in it
-	boost::shared_ptr<ConnectedComponent::pixel_list_type> dummyPixelList = boost::make_shared<ConnectedComponent::pixel_list_type>();
-	dummyPixelList->push_back(util::point<unsigned int>(focus));
+	boost::shared_ptr<ConnectedComponent::pixel_list_type> dummyPixelList = boost::make_shared<ConnectedComponent::pixel_list_type>(1);
+	dummyPixelList->add(util::point<unsigned int>(focus));
 
 	// create a connected component for this list
-	boost::shared_ptr<ConnectedComponent> dummyComponent = boost::make_shared<ConnectedComponent>(boost::shared_ptr<Image>(), 0, dummyPixelList, 0, 1);
+	boost::shared_ptr<ConnectedComponent> dummyComponent =
+			boost::make_shared<ConnectedComponent>(
+					boost::shared_ptr<Image>(),
+					0,
+					dummyPixelList,
+					dummyPixelList->begin(),
+					dummyPixelList->end());
 
 	// create a dummy slice from the component
 	boost::shared_ptr<Slice> dummySlice = boost::make_shared<Slice>(0, _section, dummyComponent);
@@ -289,21 +295,21 @@ SegmentsStackPainter::updateVisibleSegments() {
 	if (_showPrev) {
 
 		if (_showEnds && _closestPrevEndSegments.size() > _closestPrevSegment)
-			_prevSegments->add(_closestPrevEndSegments[_closestPrevSegment]);
+			_prevSegments->add(_closestPrevEndSegments[_closestPrevSegment].first);
 		else if (_showContinuations && _closestPrevContinuationSegments.size() > _closestPrevSegment)
-			_prevSegments->add(_closestPrevContinuationSegments[_closestPrevSegment]);
+			_prevSegments->add(_closestPrevContinuationSegments[_closestPrevSegment].first);
 		else if (_showBranches && _closestPrevBranchSegments.size() > _closestPrevSegment)
-			_prevSegments->add(_closestPrevBranchSegments[_closestPrevSegment]);
+			_prevSegments->add(_closestPrevBranchSegments[_closestPrevSegment].first);
 	}
 
 	if (_showNext) {
 
 		if (_showEnds && _closestNextEndSegments.size() > _closestNextSegment)
-			_nextSegments->add(_closestNextEndSegments[_closestNextSegment]);
+			_nextSegments->add(_closestNextEndSegments[_closestNextSegment].first);
 		else if (_showContinuations && _closestNextContinuationSegments.size() > _closestNextSegment)
-			_nextSegments->add(_closestNextContinuationSegments[_closestNextSegment]);
+			_nextSegments->add(_closestNextContinuationSegments[_closestNextSegment].first);
 		else if (_showBranches && _closestNextBranchSegments.size() > _closestNextSegment)
-			_nextSegments->add(_closestNextBranchSegments[_closestNextSegment]);
+			_nextSegments->add(_closestNextBranchSegments[_closestNextSegment].first);
 	}
 }
 
@@ -327,6 +333,8 @@ bool
 SegmentsStackPainter::draw(
 		const util::rect<double>&  roi,
 		const util::point<double>& resolution) {
+
+	gui::OpenGl::Guard guard;
 
 	LOG_ALL(segmentsstackpainterlog) << "redrawing section " << _section << std::endl;
 
@@ -458,17 +466,10 @@ SegmentsStackPainter::drawSlice(
 		const util::rect<double>&  roi,
 		const util::point<double>& resolution) {
 
-	// set up lighting
-	GLfloat ambient[4] = { 0, 0, 0, 1 };
-	glCheck(glLightfv(GL_LIGHT0, GL_AMBIENT, ambient));
-	GLfloat diffuse[4] = { 0.1, 0.1, 0.1, 1 };
-	glCheck(glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse));
-	GLfloat specular[4] = { 0.1, 0.1, 0.1, 1 };
-	glCheck(glLightfv(GL_LIGHT0, GL_SPECULAR, specular));
-	glCheck(glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular)); GLfloat emission[4] = { 0, 0, 0, 1 };
-	glCheck(glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission));
+	glCheck(glColor4f(red, green, blue, alpha));
 
-	// enable alpha blending
+	glCheck(glEnable(GL_TEXTURE_2D));
+
 	glCheck(glEnable(GL_BLEND));
 	glCheck(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
@@ -476,8 +477,7 @@ SegmentsStackPainter::drawSlice(
 	glCheck(glEnable(GL_LIGHTING));
 	glCheck(glEnable(GL_LIGHT0));
 	glCheck(glEnable(GL_COLOR_MATERIAL));
-
-	glCheck(glColor4f(red, green, blue, alpha));
+	glCheck(glDisable(GL_DEPTH_TEST));
 
 	_textures.get(slice.getId())->bind();
 
@@ -500,23 +500,13 @@ SegmentsStackPainter::drawSlice(
 		z = 0;
 	}
 
-	// left side
-	glTexCoord2d(1.0, 0.0); glNormal3d(0, 0, -1); glVertex3d(bb.maxX, bb.minY + offset, z);
-	glTexCoord2d(1.0, 1.0); glNormal3d(0, 0, -1); glVertex3d(bb.maxX, bb.maxY + offset, z);
-	glTexCoord2d(0.0, 1.0); glNormal3d(0, 0, -1); glVertex3d(bb.minX, bb.maxY + offset, z);
-	glTexCoord2d(0.0, 0.0); glNormal3d(0, 0, -1); glVertex3d(bb.minX, bb.minY + offset, z);
-
 	// right side
-	glTexCoord2d(0.0, 0.0); glNormal3d(0, 0, 1); glVertex3d(bb.minX, bb.minY + offset, z);
-	glTexCoord2d(0.0, 1.0); glNormal3d(0, 0, 1); glVertex3d(bb.minX, bb.maxY + offset, z);
-	glTexCoord2d(1.0, 1.0); glNormal3d(0, 0, 1); glVertex3d(bb.maxX, bb.maxY + offset, z);
-	glTexCoord2d(1.0, 0.0); glNormal3d(0, 0, 1); glVertex3d(bb.maxX, bb.minY + offset, z);
+	glTexCoord2d(0.0, 0.0); glNormal3d(0, 0, 1); glVertex3d(bb.minX, bb.minY + offset, 0);
+	glTexCoord2d(0.0, 1.0); glNormal3d(0, 0, 1); glVertex3d(bb.minX, bb.maxY + offset, 0);
+	glTexCoord2d(1.0, 1.0); glNormal3d(0, 0, 1); glVertex3d(bb.maxX, bb.maxY + offset, 0);
+	glTexCoord2d(1.0, 0.0); glNormal3d(0, 0, 1); glVertex3d(bb.maxX, bb.minY + offset, 0);
 
 	glCheck(glEnd());
-
-	glCheck(glDisable(GL_BLEND));
-	glCheck(glDisable(GL_LIGHTING));
-	glCheck(glDisable(GL_CULL_FACE));
 
 	if (_showSliceIds) {
 
@@ -527,9 +517,10 @@ SegmentsStackPainter::drawSlice(
 		double x = slice.getComponent()->getCenter().x;
 		double y = slice.getComponent()->getCenter().y + offset;
 
-		glTranslatef(x, y, z);
+		glPushMatrix();
+		glTranslatef(x, y, 0);
 		idPainter.draw(roi - util::point<double>(x, y), resolution);
-		glTranslatef(-x, -y, -z);
+		glPopMatrix();
 	}
 }
 

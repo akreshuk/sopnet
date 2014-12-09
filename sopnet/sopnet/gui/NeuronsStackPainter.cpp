@@ -1,5 +1,6 @@
 #include <boost/lexical_cast.hpp>
 
+#include <util/time.h>
 #include <gui/TextPainter.h>
 #include "NeuronsStackPainter.h"
 
@@ -14,6 +15,7 @@ NeuronsStackPainter::NeuronsStackPainter() :
 	_showContinuations(true),
 	_showBranches(true),
 	_showSliceIds(false),
+	_showSkeletons(true),
 	_alpha(0.8),
 	_zScale(15) {}
 
@@ -32,6 +34,12 @@ NeuronsStackPainter::setNeurons(boost::shared_ptr<SegmentTrees> neurons) {
 	loadTextures();
 
 	setCurrentSection(_section);
+}
+
+void
+NeuronsStackPainter::setSelection(boost::shared_ptr<SegmentTrees> selectedNeurons) {
+
+	_selectedNeurons = selectedNeurons;
 }
 
 void
@@ -85,6 +93,12 @@ void
 NeuronsStackPainter::showSliceIds(bool show) {
 
 	_showSliceIds = show;
+}
+
+void
+NeuronsStackPainter::showSkeletons(bool show) {
+
+	_showSkeletons = show;
 }
 
 void
@@ -273,6 +287,11 @@ NeuronsStackPainter::draw(
 		const util::rect<double>& roi,
 		const util::point<double>& resolution) {
 
+	gui::OpenGl::Guard guard;
+
+	glEnable(GL_BLEND);
+	glDisable(GL_DEPTH_TEST);
+
 	// aquire a read lock
 	boost::shared_lock<boost::shared_mutex> lockMe(getMutex());
 	boost::shared_lock<boost::shared_mutex> lockNeurons(_neurons->getMutex());
@@ -281,6 +300,8 @@ NeuronsStackPainter::draw(
 		return false;
 
 	LOG_ALL(neuronsstackpainterlog) << "redrawing section " << _section << std::endl;
+
+	bool selectionActive = false;
 
 	// from previous section
 
@@ -298,12 +319,22 @@ NeuronsStackPainter::draw(
 			// read lock on neuron
 			boost::shared_lock<boost::shared_mutex> lockNeuron(neuron->getMutex());
 
-			drawNeuron(*neuron, neuronNum, roi, resolution);
+			// is this neuron currently selected?
+			if (_selectedNeurons && _selectedNeurons->contains(neuron)) {
+
+				drawNeuron(*neuron, neuronNum, roi, resolution, true);
+				selectionActive = true;
+
+			} else {
+
+				drawNeuron(*neuron, neuronNum, roi, resolution);
+			}
+
 			neuronNum++;
 		}
 	}
 
-	return false;
+	return selectionActive;
 }
 
 void
@@ -311,33 +342,17 @@ NeuronsStackPainter::drawNeuron(
 		SegmentTree& neuron,
 		unsigned int neuronNum,
 		const util::rect<double>&  roi,
-		const util::point<double>& resolution) {
+		const util::point<double>& resolution,
+		bool selected) {
 
 	if (neuron.getContinuations().size() >= 1 && !_showCompleteNeurons)
 		return;
 
-	// set up lighting
-	GLfloat ambient[4] = { 0, 0, 0, 1 };
-	glCheck(glLightfv(GL_LIGHT0, GL_AMBIENT, ambient));
-	GLfloat diffuse[4] = { 0.1, 0.1, 0.1, 1 };
-	glCheck(glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse));
-	GLfloat specular[4] = { 0.1, 0.1, 0.1, 1 };
-	glCheck(glLightfv(GL_LIGHT0, GL_SPECULAR, specular));
-	glCheck(glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular)); GLfloat emission[4] = { 0, 0, 0, 1 };
-	glCheck(glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission));
-
-	// enable alpha blending
-	glCheck(glEnable(GL_BLEND));
-	glCheck(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-
-	glCheck(glEnable(GL_CULL_FACE));
-	glCheck(glEnable(GL_LIGHTING));
-	glCheck(glEnable(GL_LIGHT0));
-	glCheck(glEnable(GL_COLOR_MATERIAL));
-
 	double red   = _colors[neuronNum][0];
 	double green = _colors[neuronNum][1];
 	double blue  = _colors[neuronNum][2];
+	double alpha = _alpha;
+	double scale = (selected ? 1.0 - std::abs(0.25 - 0.001*(millisecondsSinceEpoch() % 500)) : 1.0);
 
 	// we want to show the slices of the current section and the links to slices 
 	// in the previous and next section
@@ -354,7 +369,7 @@ NeuronsStackPainter::drawNeuron(
 			if (end->getDirection() == Left) {
 
 				// draw the slice
-				drawSlice(*end->getSlice(), red, green, blue, _alpha, roi, resolution);
+				drawSlice(*end->getSlice(), red, green, blue, alpha, roi, resolution, scale);
 
 				// draw the end-link
 				drawEnd(end->getSlice()->getComponent()->getCenter(), Left, roi, resolution);
@@ -370,7 +385,7 @@ NeuronsStackPainter::drawNeuron(
 				// draw the slice, it it wasn't drawn by previous segment to the
 				// right
 				if (_section == 0)
-					drawSlice(*end->getSlice(), red, green, blue, _alpha, roi, resolution);
+					drawSlice(*end->getSlice(), red, green, blue, alpha, roi, resolution, scale);
 
 				// draw the end-link
 				drawEnd(end->getSlice()->getComponent()->getCenter(), Right, roi, resolution);
@@ -388,8 +403,8 @@ NeuronsStackPainter::drawNeuron(
 				drawSlice(
 						*continuation->getSourceSlice(),
 						red, green, blue,
-						_alpha,
-						roi, resolution);
+						alpha,
+						roi, resolution, scale);
 
 				drawContinuation(
 						continuation->getSourceSlice()->getComponent()->getCenter(),
@@ -401,8 +416,8 @@ NeuronsStackPainter::drawNeuron(
 				drawSlice(
 						*continuation->getTargetSlice(),
 						red, green, blue,
-						_alpha,
-						roi, resolution);
+						alpha,
+						roi, resolution, scale);
 
 				drawContinuation(
 						continuation->getTargetSlice()->getComponent()->getCenter(),
@@ -423,8 +438,8 @@ NeuronsStackPainter::drawNeuron(
 					drawSlice(
 							*continuation->getTargetSlice(),
 							red, green, blue,
-							_alpha,
-							roi, resolution);
+							alpha,
+							roi, resolution, scale);
 
 				drawContinuation(
 						continuation->getTargetSlice()->getComponent()->getCenter(),
@@ -439,8 +454,8 @@ NeuronsStackPainter::drawNeuron(
 					drawSlice(
 							*continuation->getSourceSlice(),
 							red, green, blue,
-							_alpha,
-							roi, resolution);
+							alpha,
+							roi, resolution, scale);
 
 				drawContinuation(
 						continuation->getSourceSlice()->getComponent()->getCenter(),
@@ -461,8 +476,8 @@ NeuronsStackPainter::drawNeuron(
 				drawSlice(
 						*branch->getSourceSlice(),
 						red, green, blue,
-						_alpha,
-						roi, resolution);
+						alpha,
+						roi, resolution, scale);
 
 				drawBranch(
 						branch->getSourceSlice()->getComponent()->getCenter(),
@@ -476,14 +491,14 @@ NeuronsStackPainter::drawNeuron(
 				drawSlice(
 						*branch->getTargetSlice1(),
 						red, green, blue,
-						_alpha,
-						roi, resolution);
+						alpha,
+						roi, resolution, scale);
 
 				drawSlice(
 						*branch->getTargetSlice2(),
 						red, green, blue,
-						_alpha,
-						roi, resolution);
+						alpha,
+						roi, resolution, scale);
 
 				drawMerge(
 						branch->getTargetSlice1()->getComponent()->getCenter(),
@@ -506,13 +521,13 @@ NeuronsStackPainter::drawNeuron(
 					drawSlice(
 							*branch->getTargetSlice1(),
 							red, green, blue,
-							_alpha,
-							roi, resolution);
+							alpha,
+							roi, resolution, scale);
 					drawSlice(
 							*branch->getTargetSlice2(),
 							red, green, blue,
-							_alpha,
-							roi, resolution);
+							alpha,
+							roi, resolution, scale);
 				}
 
 				drawMerge(
@@ -530,8 +545,8 @@ NeuronsStackPainter::drawNeuron(
 					drawSlice(
 							*branch->getSourceSlice(),
 							red, green, blue,
-							_alpha,
-							roi, resolution);
+							alpha,
+							roi, resolution, scale);
 
 				drawBranch(
 						branch->getSourceSlice()->getComponent()->getCenter(),
@@ -544,7 +559,6 @@ NeuronsStackPainter::drawNeuron(
 	}
 
 	glCheck(glDisable(GL_BLEND));
-	glCheck(glDisable(GL_LIGHTING));
 	glCheck(glDisable(GL_CULL_FACE));
 }
 
@@ -554,7 +568,8 @@ NeuronsStackPainter::drawSlice(
 		double red, double green, double blue,
 		double alpha,
 		const util::rect<double>&  roi,
-		const util::point<double>& resolution) {
+		const util::point<double>& resolution,
+		double scale) {
 
 	if (_drawnSlices.count(slice.getId()))
 		return;
@@ -565,6 +580,14 @@ NeuronsStackPainter::drawSlice(
 
 	glCheck(glEnable(GL_TEXTURE_2D));
 
+	glCheck(glEnable(GL_BLEND));
+	glCheck(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+	glCheck(glEnable(GL_CULL_FACE));
+	glCheck(glEnable(GL_LIGHTING));
+	glCheck(glEnable(GL_LIGHT0));
+	glCheck(glEnable(GL_COLOR_MATERIAL));
+
 	try {
 
 		_textures.get(slice.getId())->bind();
@@ -574,6 +597,13 @@ NeuronsStackPainter::drawSlice(
 		loadTextures();
 		_textures.get(slice.getId())->bind();
 	}
+
+	double x = slice.getComponent()->getCenter().x;
+	double y = slice.getComponent()->getCenter().y;
+
+	glPushMatrix();
+	glTranslatef(x*(1 - scale), y*(1 - scale), 0);
+	glScalef(scale, scale, scale);
 
 	glBegin(GL_QUADS);
 
@@ -589,14 +619,13 @@ NeuronsStackPainter::drawSlice(
 
 	glCheck(glEnd());
 
+	glPopMatrix();
+
 	if (_showSliceIds) {
 
 		gui::TextPainter idPainter(boost::lexical_cast<std::string>(slice.getId()));
 		idPainter.setTextSize(10.0);
 		idPainter.setTextColor(1.0 - red, 1.0 - green, 1.0 - blue);
-
-		double x = slice.getComponent()->getCenter().x;
-		double y = slice.getComponent()->getCenter().y;
 
 		glPushMatrix();
 		glTranslatef(x, y, 0);
@@ -623,12 +652,15 @@ NeuronsStackPainter::drawEnd(
 	glCheck(glEnable(GL_LINE_SMOOTH));
 	glCheck(glLineWidth(5.0));
 
-	glBegin(GL_QUADS);
-	glVertex3d(center.x - size, center.y - size, 0);
-	glVertex3d(center.x - size, center.y + size, 0);
-	glVertex3d(center.x + size, center.y + size, 0);
-	glVertex3d(center.x + size, center.y - size, 0);
-	glEnd();
+	if (_showSkeletons) {
+
+		glBegin(GL_QUADS);
+		glVertex3d(center.x - size, center.y - size, 0);
+		glVertex3d(center.x - size, center.y + size, 0);
+		glVertex3d(center.x + size, center.y + size, 0);
+		glVertex3d(center.x + size, center.y - size, 0);
+		glEnd();
+	}
 }
 
 void
@@ -648,10 +680,13 @@ NeuronsStackPainter::drawContinuation(
 	glCheck(glEnable(GL_LINE_SMOOTH));
 	glCheck(glLineWidth(5.0));
 
-	glBegin(GL_LINES);
-	glVertex3d(source.x, source.y, 0);
-	glVertex3d(target.x, target.y, 0);
-	glEnd();
+	if (_showSkeletons) {
+
+		glBegin(GL_LINES);
+		glVertex3d(source.x, source.y, 0);
+		glVertex3d(target.x, target.y, 0);
+		glEnd();
+	}
 }
 
 void
@@ -670,14 +705,17 @@ NeuronsStackPainter::drawBranch(
 
 	glCheck(glDisable(GL_TEXTURE_2D));
 
-	glBegin(GL_LINES);
-	glVertex3d(source.x, source.y, 0);
-	glVertex3d(target1.x, target1.y, 0);
-	glEnd();
-	glBegin(GL_LINES);
-	glVertex3d(source.x, source.y, 0);
-	glVertex3d(target2.x, target2.y, 0);
-	glEnd();
+	if (_showSkeletons) {
+
+		glBegin(GL_LINES);
+		glVertex3d(source.x, source.y, 0);
+		glVertex3d(target1.x, target1.y, 0);
+		glEnd();
+		glBegin(GL_LINES);
+		glVertex3d(source.x, source.y, 0);
+		glVertex3d(target2.x, target2.y, 0);
+		glEnd();
+	}
 }
 
 void
