@@ -6,6 +6,7 @@
 #include <sopnet/features/Overlap.h>
 #include <sopnet/segments/Segments.h>
 #include "ProblemConfiguration.h"
+#include <imageprocessing/ImageStack.h>
 
 class ProblemAssembler : public pipeline::SimpleProcessNode<> {
 

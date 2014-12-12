@@ -91,7 +91,7 @@ PairSegmentCreator::groupBySynapse() {
 		unsigned int total_synapses = vigra::labelImageWithBackground(bin, cc, false, 0);
 		std::cout<<total_synapses<<" found by thresholding in image "<<interval_index<<std::endl;
 		//find the segments of this image
-		//FIXME: only continuations for now?
+		//FIXME: only continuations for now? Then nothing is found in the first and last slices
 
 		//for each synapse: 1) take the mask, 2) dilate by 1 or 2, 3) create ConnectedComponent
 		// 4) for each segment, check intersections on the first slice
@@ -125,7 +125,16 @@ PairSegmentCreator::groupBySynapse() {
 				//check, if bounding boxes overlap
 				util::rect<int> slice_bbox = first_slice_cc->getBoundingBox();
 				if (syn_bbox.intersects(slice_bbox)){
-					synapse_groups[isyn].push_back(segment);
+					PixelList::const_iterator iter;
+					for (iter=first_slice_cc->getPixels().first; iter!=first_slice_cc->getPixels().second; ++iter){
+						if (cc(iter->x, iter->y)==isyn){
+							synapse_groups[isyn].push_back(segment);
+							break;
+						}
+					}
+
+
+					//synapse_groups[isyn].push_back(segment);
 				}
 			}
 			std::cout<<"synapse "<<isyn<<", bounding box: "<<syn_bbox.minX<<", "<<syn_bbox.minY<<", "<< syn_bbox.maxX<<", "<<syn_bbox.maxY<<std::endl;

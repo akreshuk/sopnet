@@ -123,33 +123,20 @@ ProblemAssembler::collectSegments() {
 		_numMitochondriaSegments += segments->size();
 	}
 
-	//
-	//foreach (boost::shared_ptr<Segments> segments, _synapseSegments) {
 
-	//	_allSegments->addAll(segments);
-	//	_allSynapseSegments->addAll(segments);
-	//	_numSynapseSegments += segments->size();
-	//}
+	foreach (boost::shared_ptr<Segments> segments, _synapseSegments) {
+
+		_allSegments->addAll(segments);
+		_allSynapseSegments->addAll(segments);
+		_numSynapseSegments += segments->size();
+	}
 
 	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments" << std::endl;
 
 	LOG_DEBUG(problemassemblerlog) << "starting with pair segments"<<std::endl;
 	PairSegmentCreator creator(*_allNeuronSegments, *_synapseImages, 1.0);
 	creator.groupBySynapse();
-
-
-	/*
-    //now try to extract pair segments on top of neuronSegments
-	std::vector<boost::shared_ptr<Segments> > temp_segments;
-	foreach (boost::shared_ptr<Segments> segments, _neuronSegments) {
-		temp_segments.push_back(segments);
-
-	}
-	ImageStack& synapseImages = *_synapseImages;
-	PairSegmentCreator creator(temp_segments, "/home/akreshuk//thirdparty/sopnet/drosophila-l3/data/stack2/01_classification/median_filtered/synapse_thresholded", 1.0);
-	creator.groupBySynapse();
-	*/
-
+	extractSynapseEnclosingNeuronSegments();
 
 
 }
@@ -530,8 +517,13 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 	unsigned int maxSynapseNeuronDistance = optionMaxSynapseNeuronDistance;
 	_enclosingSynapseThreshold = optionSynapseEnclosingThreshold;
 
+	//std::cout<<"Here we are!"<<std::endl;
+	//std::cout<<"synapse enclosing threshold:"<<_enclosingSynapseThreshold<<std::endl;
+
 	foreach (boost::shared_ptr<Segment> synapseSegment, _allSynapseSegments->getSegments()) {
 
+
+		//std::cout<<"Processing another synapse segment!"<<std::endl;
 		unsigned int synapseSegmentId = synapseSegment->getId();
 
 		boost::shared_ptr<EndSegment> end;
@@ -559,6 +551,14 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 				maxSynapseNeuronDistance))
 			if (encloses(branch, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(branch->getId());
+
+		std::cout<<"found all enclosing segments for a synapse segment!  "<<synapseSegmentId<<std::endl;
+		for (std::vector<unsigned int>::const_iterator it=_synapseEnclosingNeuronSegments[synapseSegmentId].begin();
+				it!=_synapseEnclosingNeuronSegments[synapseSegmentId].end(); ++it){
+			std::cout<<(*it)<<" ,";
+		}
+		std::cout<<std::endl;
+		//std::cout<<_synapseEnclosingNeuronSegments[synapseSegmentId]<<std::endl;
 	}
 }
 
