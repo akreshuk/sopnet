@@ -134,9 +134,14 @@ ProblemAssembler::collectSegments() {
 	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments" << std::endl;
 
 	LOG_DEBUG(problemassemblerlog) << "starting with pair segments"<<std::endl;
-	PairSegmentCreator creator(*_allNeuronSegments, *_synapseImages, 1.0);
+	//FIXME: temporary hack, there should be a better way
+	std::vector<boost::shared_ptr<LinearConstraints> > tempConstraints;
+	foreach (boost::shared_ptr<LinearConstraints> constraints, _neuronLinearConstraints) {
+		tempConstraints.push_back(constraints);
+	}
+	PairSegmentCreator creator(*_allNeuronSegments, *_synapseImages, tempConstraints, 1.0);
 	creator.groupBySynapse();
-	extractSynapseEnclosingNeuronSegments();
+	//extractSynapseEnclosingNeuronSegments();
 
 
 }
@@ -520,6 +525,7 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 	//std::cout<<"Here we are!"<<std::endl;
 	//std::cout<<"synapse enclosing threshold:"<<_enclosingSynapseThreshold<<std::endl;
 
+	unsigned int count = 0;
 	foreach (boost::shared_ptr<Segment> synapseSegment, _allSynapseSegments->getSegments()) {
 
 
@@ -552,14 +558,20 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 			if (encloses(branch, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(branch->getId());
 
-		std::cout<<"found all enclosing segments for a synapse segment!  "<<synapseSegmentId<<std::endl;
-		for (std::vector<unsigned int>::const_iterator it=_synapseEnclosingNeuronSegments[synapseSegmentId].begin();
-				it!=_synapseEnclosingNeuronSegments[synapseSegmentId].end(); ++it){
-			std::cout<<(*it)<<" ,";
+
+		if (_synapseEnclosingNeuronSegments[synapseSegmentId].size()>0){
+			std::cout<<"found all enclosing segments for a synapse segment!  "<<synapseSegmentId<<"  "<<_synapseEnclosingNeuronSegments[synapseSegmentId].size()<<std::endl;
+		} else {
+			count++;
 		}
-		std::cout<<std::endl;
+		//for (std::vector<unsigned int>::const_iterator it=_synapseEnclosingNeuronSegments[synapseSegmentId].begin();
+		//		it!=_synapseEnclosingNeuronSegments[synapseSegmentId].end(); ++it){
+		//	std::cout<<(*it)<<" ,";
+		//}
+
 		//std::cout<<_synapseEnclosingNeuronSegments[synapseSegmentId]<<std::endl;
 	}
+	std::cout<<"total without neuron segments: "<<count<<std::endl;
 }
 
 bool

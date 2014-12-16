@@ -26,8 +26,11 @@ PairSegmentCreator::PairSegmentCreator(
 PairSegmentCreator::PairSegmentCreator(
 		Segments& segments,
 		ImageStack& syn_map,
-		double distance): _neuron_segments{segments},
+		std::vector<boost::shared_ptr<LinearConstraints> > constraints,
+		double distance):
+		_neuron_segments{segments},
 		_synapse_map{syn_map},
+		_neuron_linear_constraints{constraints},
 		_distance{distance} {};
 
 /*
