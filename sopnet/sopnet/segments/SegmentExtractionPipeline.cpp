@@ -35,6 +35,15 @@ SegmentExtractionPipeline::getSegments(unsigned int interval) {
 }
 
 pipeline::OutputBase&
+SegmentExtractionPipeline::getConflictSets(unsigned int section) {
+
+	LOG_ALL(segmentextractionpipelinelog) << "getting conflict sets for section " << section << std::endl;
+
+	return _sliceExtractors[section]->getOutput("conflict sets");
+}
+
+
+pipeline::OutputBase&
 SegmentExtractionPipeline::getConstraints(unsigned int interval) {
 
 	LOG_ALL(segmentextractionpipelinelog) << "getting constraints for interval " << interval << std::endl;

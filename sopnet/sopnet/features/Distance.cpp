@@ -27,7 +27,8 @@ Distance::operator()(
 		bool symmetric,
 		bool align,
 		double& avgSliceDistance,
-		double& maxSliceDistance) {
+		double& maxSliceDistance,
+		double& minSliceDistance) {
 
 	// values to add to slice2's pixel positions
 	util::point<int> offset2(0, 0);
@@ -36,19 +37,21 @@ Distance::operator()(
 	if (align)
 		offset2 = slice1.getComponent()->getCenter() - slice2.getComponent()->getCenter();
 
-	distance(slice1, slice2, offset2, avgSliceDistance, maxSliceDistance);
+	distance(slice1, slice2, offset2, avgSliceDistance, maxSliceDistance, minSliceDistance);
 
 	if (symmetric) {
 
 		double avgSliceDistanceS;
 		double maxSliceDistanceS;
+		double minSliceDistanceS;
 
-		distance(slice2, slice1, -offset2, avgSliceDistanceS, maxSliceDistanceS);
+		distance(slice2, slice1, -offset2, avgSliceDistanceS, maxSliceDistanceS, minSliceDistanceS);
 
 		avgSliceDistance += avgSliceDistanceS;
 		avgSliceDistance /= 2;
 
 		maxSliceDistance = std::max(maxSliceDistance, maxSliceDistanceS);
+		minSliceDistance = std::min(minSliceDistance, minSliceDistanceS);
 	}
 }
 
@@ -60,7 +63,8 @@ Distance::operator()(
 		bool symmetric,
 		bool align,
 		double& avgSliceDistance,
-		double& maxSliceDistance) {
+		double& maxSliceDistance,
+		double& minSliceDistance) {
 
 	// values to add to slice2's pixel positions
 	util::point<int> offset2(0, 0);
@@ -81,9 +85,10 @@ Distance::operator()(
 
 	double avgSliceDistancea, avgSliceDistanceb;
 	double maxSliceDistancea, maxSliceDistanceb;
+	double minSliceDistancea, minSliceDistanceb;
 
-	distance(slice1a, slice2, offset2, avgSliceDistancea, maxSliceDistancea);
-	distance(slice1b, slice2, offset2, avgSliceDistanceb, maxSliceDistanceb);
+	distance(slice1a, slice2, offset2, avgSliceDistancea, maxSliceDistancea, minSliceDistancea);
+	distance(slice1b, slice2, offset2, avgSliceDistanceb, maxSliceDistanceb, minSliceDistanceb);
 
 	avgSliceDistance =
 			(avgSliceDistancea*slice1a.getComponent()->getSize() +
@@ -91,18 +96,22 @@ Distance::operator()(
 			(slice1a.getComponent()->getSize() + slice1b.getComponent()->getSize());
 
 	maxSliceDistance = std::max(maxSliceDistancea, maxSliceDistanceb);
+	minSliceDistance = std::min(minSliceDistancea, minSliceDistanceb);
 
 	if (symmetric) {
 
 		double avgSliceDistanceS;
 		double maxSliceDistanceS;
+		double minSliceDistanceS;
 
-		distance(slice2, slice1a, slice1b, -offset2, avgSliceDistanceS, maxSliceDistanceS);
+		distance(slice2, slice1a, slice1b, -offset2, avgSliceDistanceS, maxSliceDistanceS, minSliceDistanceS);
 
 		avgSliceDistance += avgSliceDistanceS;
 		avgSliceDistance /= 2;
 
 		maxSliceDistance = std::max(maxSliceDistance, maxSliceDistanceS);
+		minSliceDistance = std::min(minSliceDistance, minSliceDistanceS);
+
 	}
 }
 
@@ -112,7 +121,8 @@ Distance::distance(
 		const Slice& s2,
 		const util::point<int>& offset2,
 		double& avgSliceDistance,
-		double& maxSliceDistance) {
+		double& maxSliceDistance,
+		double& minSliceDistance) {
 
 	const ConnectedComponent& c1 = *s1.getComponent();
 
@@ -121,6 +131,7 @@ Distance::distance(
 	double totalDistance = 0.0;
 
 	maxSliceDistance = 0.0;
+	minSliceDistance = _maxDistance;
 
 	foreach (util::point<int> p1, c1.getPixels()) {
 
@@ -132,6 +143,7 @@ Distance::distance(
 
 			totalDistance += _maxDistance;
 			maxSliceDistance = std::max(maxSliceDistance, _maxDistance);
+			minSliceDistance = _maxDistance;
 			continue;
 		}
 
@@ -142,6 +154,7 @@ Distance::distance(
 		double dist = getDistanceMap(s2)(p1.x, p1.y);
 		totalDistance += dist;
 		maxSliceDistance = std::max(maxSliceDistance, dist);
+		minSliceDistance = std::min(minSliceDistance, dist);
 	}
 
 	avgSliceDistance = totalDistance/s1.getComponent()->getSize();
@@ -154,7 +167,8 @@ Distance::distance(
 		const Slice& s2b,
 		const util::point<int>& offset2,
 		double& avgSliceDistance,
-		double& maxSliceDistance) {
+		double& maxSliceDistance,
+		double& minSliceDistance) {
 
 	const ConnectedComponent& c1 = *s1.getComponent();
 
@@ -164,6 +178,7 @@ Distance::distance(
 	double totalDistance = 0.0;
 
 	maxSliceDistance = 0.0;
+	minSliceDistance = _maxDistance;
 
 	foreach (util::point<int> p1, c1.getPixels()) {
 
@@ -214,6 +229,7 @@ Distance::distance(
 		double dist = std::min(distancea, distanceb);
 		totalDistance += dist;
 		maxSliceDistance = std::max(maxSliceDistance, dist);
+		minSliceDistance = std::min(minSliceDistance, dist);
 	}
 
 	avgSliceDistance = totalDistance/s1.getComponent()->getSize();

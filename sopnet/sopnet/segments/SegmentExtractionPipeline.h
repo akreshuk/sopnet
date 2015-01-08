@@ -49,6 +49,11 @@ public:
 	pipeline::OutputBase& getSegments(unsigned int interval);
 
 	/**
+	 * Get the slice conflict sets for the given section.
+	 */
+	pipeline::OutputBase& getConflictSets(unsigned int section);
+
+	/**
 	 * Get linear constraints on the segments in the given interval.
 	 */
 	pipeline::OutputBase& getConstraints(unsigned int interval);

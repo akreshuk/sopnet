@@ -7,14 +7,15 @@
 #include <boost/serialization/map.hpp>
 
 #include <pipeline/all.h>
+#include <sopnet/segments/Segments.h>
 
 class Features : public pipeline::Data {
 
 	typedef std::vector<std::vector<double> > features_type;
 
-	typedef std::map<unsigned int, unsigned int> segment_ids_map;
-
 public:
+
+	typedef std::map<unsigned int, unsigned int> segment_ids_map;
 
 	Features();
 
@@ -28,10 +29,21 @@ public:
 
 	void clear();
 
-	void resize(unsigned int numVectors, unsigned int numFeatures);
+	/**
+	 * Create a mapping from segment ids to feature vector indices. Creates one empty feature vector for each segment.
+	 */
+	void createSegmentIdsMap(const Segments& segments);
+
+	/**
+	 * Resize each currently contained feature vector. New values will be set to NoFeatureValue.
+	 */
+	void resize(unsigned int numFeatures);
 
 	unsigned int numFeatures();
 
+	/**
+	 * Get the feature vector associated to the given segment id.
+	 */
 	std::vector<double>& get(unsigned int segmentId);
 
 	unsigned int size();
@@ -44,13 +56,19 @@ public:
 
 	const_iterator end() const;
 
+	/**
+	 * Get the ith feature vector.
+	 */
 	std::vector<double>& operator[](unsigned int i);
 
+	/**
+     * Get the ith feature vector.
+	 */
 	const std::vector<double>& operator[](unsigned int i) const;
 
 	void setSegmentIdsMap(const segment_ids_map& map);
 
-	const segment_ids_map& getSegmentsIdsMap() const;
+	const segment_ids_map& getSegmentIdsMap() const;
 
 	static double NoFeatureValue;
 
@@ -71,8 +89,6 @@ private:
 
 	// a map from segment ids to the corresponding feature
 	segment_ids_map          _segmentIdsMap;
-
-	unsigned int             _nextSegmentIndex;
 };
 
 std::ostream&

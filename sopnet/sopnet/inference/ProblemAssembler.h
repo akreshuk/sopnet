@@ -83,8 +83,11 @@ private:
 	// synapse linear constraints on the segments for each pair of frames
 	pipeline::Inputs<LinearConstraints> _synapseLinearConstraints;
 
-	// the synapse prediction image stack
-	pipeline::Input<ImageStack>         _synapseImages;
+	// a list of pair segments for each pair of frames
+	pipeline::Inputs<Segments>          _pairSegments;
+
+	// pair linear constraints on the segments for each pair of frames
+	pipeline::Inputs<LinearConstraints> _pairLinearConstraints;
 
 	// all segments in the problem
 	pipeline::Output<Segments>          _allSegments;

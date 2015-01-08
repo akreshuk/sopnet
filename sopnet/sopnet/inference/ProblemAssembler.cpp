@@ -50,7 +50,8 @@ ProblemAssembler::ProblemAssembler() :
 	registerInputs(_mitochondriaLinearConstraints, "mitochondria linear constraints");
 	registerInputs(_synapseSegments, "synapse segments");
 	registerInputs(_synapseLinearConstraints, "synapse linear constraints");
-    registerInput(_synapseImages, "synapse images");
+	registerInputs(_pairSegments, "pair segments");
+	registerInputs(_pairLinearConstraints, "pair linear constraints");
 
 	registerOutput(_allSegments, "segments");
 	registerOutput(_allNeuronSegments, "neuron segments");
@@ -133,14 +134,14 @@ ProblemAssembler::collectSegments() {
 
 	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments" << std::endl;
 
-	LOG_DEBUG(problemassemblerlog) << "starting with pair segments"<<std::endl;
+	//LOG_DEBUG(problemassemblerlog) << "starting with pair segments"<<std::endl;
 	//FIXME: temporary hack, there should be a better way
-	std::vector<boost::shared_ptr<LinearConstraints> > tempConstraints;
-	foreach (boost::shared_ptr<LinearConstraints> constraints, _neuronLinearConstraints) {
-		tempConstraints.push_back(constraints);
-	}
-	PairSegmentCreator creator(*_allNeuronSegments, *_synapseImages, tempConstraints, 1.0);
-	creator.groupBySynapse();
+	//std::vector<boost::shared_ptr<LinearConstraints> > tempConstraints;
+	//foreach (boost::shared_ptr<LinearConstraints> constraints, _neuronLinearConstraints) {
+	//	tempConstraints.push_back(constraints);
+	//}
+	//PairSegmentCreator creator(*_allNeuronSegments, *_synapseImages, tempConstraints, 1.0);
+	//creator.groupBySynapse();
 	//extractSynapseEnclosingNeuronSegments();
 
 

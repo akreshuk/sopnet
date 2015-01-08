@@ -34,10 +34,12 @@ GeometryFeatureExtractor::updateOutputs() {
 
 	_features->clear();
 
+	_features->createSegmentIdsMap(*_segments);
+
 	if (_noSliceDistance)
-		_features->resize(_segments->size(), 12);
+		_features->resize(12);
 	else
-		_features->resize(_segments->size(), 16);
+		_features->resize(16);
 
 	// features for end segments
 	_features->addName("e size");
@@ -156,13 +158,13 @@ GeometryFeatureExtractor::computeFeatures(const ContinuationSegment& continuatio
 
 	if (!_noSliceDistance) {
 
-		double averageSliceDistance, maxSliceDistance;
+		double averageSliceDistance, maxSliceDistance, minSliceDistance;
 
-		_distance(*continuation.getSourceSlice(), *continuation.getTargetSlice(), true, false, averageSliceDistance, maxSliceDistance);
+		_distance(*continuation.getSourceSlice(), *continuation.getTargetSlice(), true, false, averageSliceDistance, maxSliceDistance, minSliceDistance);
 
-		double alignedAverageSliceDistance, alignedMaxSliceDistance;
+		double alignedAverageSliceDistance, alignedMaxSliceDistance, alignedMinSliceDistance;
 
-		_distance(*continuation.getSourceSlice(), *continuation.getTargetSlice(), true, true, alignedAverageSliceDistance, alignedMaxSliceDistance);
+		_distance(*continuation.getSourceSlice(), *continuation.getTargetSlice(), true, true, alignedAverageSliceDistance, alignedMaxSliceDistance, alignedMinSliceDistance);
 
 		features[12] = averageSliceDistance;
 		features[13] = maxSliceDistance;
@@ -219,13 +221,13 @@ GeometryFeatureExtractor::computeFeatures(const BranchSegment& branch, std::vect
 
 	if (!_noSliceDistance) {
 
-		double averageSliceDistance, maxSliceDistance;
+		double averageSliceDistance, maxSliceDistance, minSliceDistance;
 
-		_distance(*branch.getTargetSlice1(), *branch.getTargetSlice2(), *branch.getSourceSlice(), true, false, averageSliceDistance, maxSliceDistance);
+		_distance(*branch.getTargetSlice1(), *branch.getTargetSlice2(), *branch.getSourceSlice(), true, false, averageSliceDistance, maxSliceDistance, minSliceDistance);
 
-		double alignedAverageSliceDistance, alignedMaxSliceDistance;
+		double alignedAverageSliceDistance, alignedMaxSliceDistance, alignedMinSliceDistance;
 
-		_distance(*branch.getTargetSlice1(), *branch.getTargetSlice2(), *branch.getSourceSlice(), true, true, alignedAverageSliceDistance, alignedMaxSliceDistance);
+		_distance(*branch.getTargetSlice1(), *branch.getTargetSlice2(), *branch.getSourceSlice(), true, true, alignedAverageSliceDistance, alignedMaxSliceDistance, alignedMinSliceDistance);
 
 		features[12] = averageSliceDistance;
 		features[13] = maxSliceDistance;

@@ -3,8 +3,7 @@
 
 double Features::NoFeatureValue = 0;
 
-Features::Features() :
-	_nextSegmentIndex(0) {}
+Features::Features() {}
 
 void
 Features::addName(const std::string& name) {
@@ -25,15 +24,28 @@ Features::clear(){
 	_featureNames.clear();
 	_segmentIdsMap.clear();
 
-	_nextSegmentIndex = 0;
 }
 
 void
-Features::resize(unsigned int numVectors, unsigned int numFeatures) {
+Features::createSegmentIdsMap(const Segments& segments) {
 
-	std::vector<double> templ(numFeatures, 0.0);
+	unsigned int nextSegmentIndex = 0;
 
-	_features.resize(numVectors, templ);
+	foreach (boost::shared_ptr<Segment> segment, segments.getSegments()) {
+
+		_segmentIdsMap[segment->getId()] = nextSegmentIndex;
+		nextSegmentIndex++;
+	}
+}
+
+void
+Features::resize(unsigned int numFeatures) {
+
+	_features.resize(_segmentIdsMap.size());
+
+	foreach (std::vector<double>& f, _features)
+		f.resize(numFeatures, NoFeatureValue);
+	std::vector<double> templ(numFeatures, NoFeatureValue);
 }
 
 unsigned int
@@ -47,8 +59,9 @@ Features::get(unsigned int segmentId) {
 
 	if (!_segmentIdsMap.count(segmentId)) {
 
-		_segmentIdsMap[segmentId] = _nextSegmentIndex;
-		_nextSegmentIndex++;
+		UTIL_THROW_EXCEPTION(
+				UsageError,
+				"segment with id " << segmentId << " is not part of this feature list");
 	}
 
 	return _features[_segmentIdsMap[segmentId]];
@@ -103,7 +116,7 @@ Features::setSegmentIdsMap(const segment_ids_map& map) {
 }
 
 const Features::segment_ids_map&
-Features::getSegmentsIdsMap() const {
+Features::getSegmentIdsMap() const {
 
 	return _segmentIdsMap;
 }

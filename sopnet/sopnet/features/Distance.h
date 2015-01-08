@@ -16,7 +16,7 @@ class Distance {
 public:
 
 	/**
-	 * Create a new Distance feature funtor.
+	 * Create a new Distance feature functor.
 	 *
 	 * @param maxDistance The value to assign pixels that are lying outside the
 	 *                    distance map of the slice they are compared to.
@@ -32,6 +32,7 @@ public:
 	 *              other.
 	 * @param avgSliceDistance[out] The average minimal distance per pixel.
 	 * @param maxSliceDistance[out] The maximal minimal distance of each pixel.
+	 * @param minSliceDistance[out] The minimal minimal distance of each pixel.
 	 *
 	 * @return The average minimal distance of a pixel in one slice to any pixel
 	 *         in the other slice.
@@ -42,7 +43,8 @@ public:
 			bool symmetric,
 			bool align,
 			double& avgSliceDistance,
-			double& maxSliceDistance);
+			double& maxSliceDistance,
+			double& minSliceDistance);
 
 	/**
 	 * Computes the average minimal pixel distance between two slices and
@@ -65,7 +67,8 @@ public:
 			bool symmetric,
 			bool align,
 			double& avgSliceDistance,
-			double& maxSliceDistance);
+			double& maxSliceDistance,
+			double& minSliceDistance);
 
 	/**
 	 * Free all the memory allocated for distance maps of previous slices.
@@ -84,7 +87,8 @@ private:
 			const Slice& slice2,
 			const util::point<int>& offset2,
 			double& avgSliceDistance,
-			double& maxSliceDistance);
+			double& maxSliceDistance,
+			double& minSliceDistance);
 
 	void distance(
 			const Slice& s1,
@@ -92,7 +96,8 @@ private:
 			const Slice& s2b,
 			const util::point<int>& offset2,
 			double& avgSliceDistance,
-			double& maxSliceDistance);
+			double& maxSliceDistance,
+			double& minSliceDistance);
 
 	const distance_map_type& getDistanceMap(const Slice& slice);
 

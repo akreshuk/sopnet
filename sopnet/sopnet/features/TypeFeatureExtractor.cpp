@@ -20,7 +20,8 @@ TypeFeatureExtractor::updateOutputs() {
 	_features->clear();
 
 	// end, continuation, branch
-	_features->resize(_segments->size(), 3);
+	_features->createSegmentIdsMap(*_segments);
+	_features->resize(3);
 
 	_features->addName("is end");
 	_features->addName("is continuation");

@@ -7,6 +7,7 @@
 #include <pipeline/Process.h>
 #include <util/foreach.h>
 #include <util/ProgramOptions.h>
+#include <sopnet/segments/PairSegmentExtractor.h>
 #include <sopnet/evaluation/GroundTruthExtractor.h>
 #include <sopnet/features/SegmentFeaturesExtractor.h>
 #include <sopnet/inference/ProblemGraphWriter.h>
@@ -76,6 +77,11 @@ util::ProgramOption optionReadGoldStandardFromFile(
 		util::_module           = "sopnet.training",
 		util::_long_name        = "readGoldStandardFromFile",
 		util::_description_text = "Instead of looking at the ground truth, read the gold standard from a file with segment hashes, where each line is of the form: [0 or 1 (part of GS or not)] # [hash].");
+
+util::ProgramOption optionExtractPairSegments(
+		util::_module           = "sopnet",
+		util::_long_name        = "extractPairSegments",
+		util::_description_text = "Extract pair segments, i.e., segments that represent two neuron segments around a potential synapse.");
 
 Sopnet::Sopnet(
 		const std::string& projectDirectory,
@@ -284,6 +290,25 @@ Sopnet::createBasicPipeline() {
 	else if (_synapseSlices.isSet())
 		_synapseSegmentExtractorPipeline = boost::make_shared<SegmentExtractionPipeline>(_synapseSlices.getSharedPointer(), false, finishLastSection);
 
+	//std::vector<boost::shared_ptr<PairSegmentExtractor> > pairSegmentExtractors;
+	_pairSegmentExtractors.clear();
+	if (optionExtractPairSegments) {
+
+		for (unsigned int i = 0; i < _neuronSegmentExtractorPipeline->numIntervals(); i++) {
+
+			boost::shared_ptr<PairSegmentExtractor> pairExtractor = boost::make_shared<PairSegmentExtractor>();
+			_pairSegmentExtractors.push_back(pairExtractor);
+
+			pairExtractor->setInput("neuron segments", _neuronSegmentExtractorPipeline->getSegments(i));
+			pairExtractor->setInput("synapse segments", _synapseSegmentExtractorPipeline->getSegments(i));
+
+			if (i > 0)
+				pairExtractor->setInput("prev neuron slice conflict sets", _neuronSegmentExtractorPipeline->getConflictSets(i-1));
+			if (i < _neuronSegmentExtractorPipeline->numIntervals() - 1)
+				pairExtractor->setInput("next neuron slice conflict sets", _neuronSegmentExtractorPipeline->getConflictSets(i));
+		}
+	}
+
 	LOG_DEBUG(sopnetlog) << "feeding output into problem assembler..." << std::endl;
 
 	for (unsigned int i = 0; i < _neuronSegmentExtractorPipeline->numIntervals(); i++) {
@@ -303,10 +328,13 @@ Sopnet::createBasicPipeline() {
 			_problemAssembler->addInput("synapse segments", _synapseSegmentExtractorPipeline->getSegments(i));
 			_problemAssembler->addInput("synapse linear constraints", _synapseSegmentExtractorPipeline->getConstraints(i));
 		}
-	}
 
-	if (_synapseSlices.isSet())
-		_problemAssembler->setInput("synapse images", _synapseSlices);
+		if (optionExtractPairSegments) {
+
+			_problemAssembler->addInput("pair segments", _pairSegmentExtractors[i]->getOutput("segments"));
+			_problemAssembler->addInput("pair linear constraints", _pairSegmentExtractors[i]->getOutput("linear constraints"));
+		}
+	}
 
 	if (_groundTruth.isSet())
 		_groundTruthExtractor->setInput(_groundTruth);

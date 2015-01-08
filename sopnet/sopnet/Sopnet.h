@@ -15,6 +15,7 @@ class ImageExtractor;
 class ImageStack;
 class LinearSolver;
 class ObjectiveGenerator;
+class PairSegmentExtractor;
 class PriorCostFunction;
 class ProblemAssembler;
 class RandomForestCostFunction;
@@ -115,6 +116,8 @@ private:
 	boost::shared_ptr<SegmentExtractionPipeline>      	_mitochondriaSegmentExtractorPipeline;
 
 	boost::shared_ptr<SegmentExtractionPipeline>      	_synapseSegmentExtractorPipeline;
+
+	std::vector<boost::shared_ptr<PairSegmentExtractor> > _pairSegmentExtractors;
 
 	// the problem assembler that collects all segments and linear constraints
 	boost::shared_ptr<ProblemAssembler>               	_problemAssembler;

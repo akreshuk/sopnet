@@ -77,6 +77,8 @@ SegmentFeaturesExtractor::FeaturesAssembler::updateOutputs() {
 
 		if (_allFeatures->size() == 0) {
 
+            _allFeatures->setSegmentIdsMap(features->getSegmentIdsMap());
+
 			LOG_ALL(segmentfeaturesextractorlog) << "initialising all features with " << features->size() << " feature vectors from current feature group" << std::endl;
 
 			unsigned int numFeatures = (features->size() > 0  ? (*features)[0].size() : 0);
@@ -84,39 +86,43 @@ SegmentFeaturesExtractor::FeaturesAssembler::updateOutputs() {
 			if (optionSquareFeatures)
 				numFeatures *= 2;
 
-			_allFeatures->resize(features->size(), numFeatures);
+			_allFeatures->resize(numFeatures);
 
-			unsigned int i = 0;
-			foreach (const std::vector<double>& feature, *features) {
+			unsigned int segmentId;
+			unsigned int i;
+			foreach (boost::tie(segmentId, i), features->getSegmentIdsMap()) {
 
-				std::copy(feature.begin(), feature.end(), (*_allFeatures)[i].begin());
+				const std::vector<double>& feature = features->get(segmentId);
+				std::copy(feature.begin(), feature.end(), _allFeatures->get(segmentId).begin());
 
 				// add the squares
 				if (optionSquareFeatures)
 					for (unsigned int j = 0; j < feature.size(); j++)
-						(*_allFeatures)[i][j + feature.size()] = feature[j]*feature[j];
-
-				i++;
+						_allFeatures->get(segmentId)[j + feature.size()] = feature[j]*feature[j];
 			}
 
 		} else {
 
 			LOG_ALL(segmentfeaturesextractorlog) << "appending " << features->size() << " features from current feature group" << std::endl;
 
-			unsigned int i = 0;
-			foreach (const std::vector<double>& feature, *features) {
+			unsigned int numFeatures = features->numFeatures();
+			unsigned int prevSize = _allFeatures->numFeatures();
+			unsigned int newSize = prevSize + numFeatures*(optionSquareFeatures ? 2 : 1);
 
-				unsigned int prevSize = (*_allFeatures)[i].size();
-				unsigned int newSize  = prevSize + feature.size()*(optionSquareFeatures ? 2 : 1);
+			_allFeatures->resize(newSize);
 
-				(*_allFeatures)[i].resize(newSize);
+			unsigned int segmentId;
+			unsigned int i;
+			foreach (boost::tie(segmentId, i), features->getSegmentIdsMap()) {
 
-				std::copy(feature.begin(), feature.end(), (*_allFeatures)[i].begin() + prevSize);
+				const std::vector<double>& feature = features->get(segmentId);
+
+				std::copy(feature.begin(), feature.end(), _allFeatures->get(segmentId).begin() + prevSize);
 
 				// add the squares
 				if (optionSquareFeatures)
 					for (unsigned int j = 0; j < feature.size(); j++)
-						(*_allFeatures)[i][j + feature.size() + prevSize] = feature[j]*feature[j];
+						_allFeatures->get(segmentId)[j + feature.size() + prevSize] = feature[j]*feature[j];
 
 				i++;
 			}
@@ -126,5 +132,5 @@ SegmentFeaturesExtractor::FeaturesAssembler::updateOutputs() {
 	}
 
 	// the new features should have the same segment ids map like every features
-	_allFeatures->setSegmentIdsMap(_features[0]->getSegmentsIdsMap());
+	_allFeatures->setSegmentIdsMap(_features[0]->getSegmentIdsMap());
 }
