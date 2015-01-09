@@ -40,6 +40,7 @@ ProblemAssembler::ProblemAssembler() :
 	_allNeuronSegments(new Segments()),
 	_allMitochondriaSegments(new Segments()),
 	_allSynapseSegments(new Segments()),
+	_allPairSegments(new Segments()),
 	_allLinearConstraints(new LinearConstraints()),
 	_problemConfiguration(new ProblemConfiguration()),
 	_overlap(false, false) {
@@ -57,6 +58,7 @@ ProblemAssembler::ProblemAssembler() :
 	registerOutput(_allNeuronSegments, "neuron segments");
 	registerOutput(_allMitochondriaSegments, "mitochondria segments");
 	registerOutput(_allSynapseSegments, "synapse segments");
+	registerOutput(_allPairSegments, "pair segments");
 	registerOutput(_allLinearConstraints, "linear constraints");
 	registerOutput(_problemConfiguration, "problem configuration");
 }
@@ -90,6 +92,11 @@ ProblemAssembler::collectSegments() {
 	_numMitochondriaSegments = 0;
 	_allSynapseSegments->clear();
 	_numSynapseSegments = 0;
+	std::cout<<"clearing pair segments"<<std::endl;
+	_allPairSegments->clear();
+	_numPairSegments = 0;
+
+	std::cout<<"all cleared"<<std::endl;
 
 	if (_neuronSegments.size() > 0) {
 
@@ -109,6 +116,11 @@ ProblemAssembler::collectSegments() {
 				_neuronSegments[0]->getResolutionX(),
 				_neuronSegments[0]->getResolutionY(),
 				_neuronSegments[0]->getResolutionZ());
+		_allPairSegments->setResolution(
+				_neuronSegments[0]->getResolutionX(),
+				_neuronSegments[0]->getResolutionY(),
+				_neuronSegments[0]->getResolutionZ());
+
 	}
 
 	foreach (boost::shared_ptr<Segments> segments, _neuronSegments) {
@@ -130,6 +142,16 @@ ProblemAssembler::collectSegments() {
 		_allSegments->addAll(segments);
 		_allSynapseSegments->addAll(segments);
 		_numSynapseSegments += segments->size();
+	}
+
+
+	std::cout<<"PROBLEM ASSEMBLER, adding pair segments"<<std::endl;
+
+	foreach (boost::shared_ptr<Segments> segments, _pairSegments) {
+		std::cout<<"add more pair segments!"<<std::endl;
+		_allSegments->addAll(segments);
+		_allPairSegments->addAll(segments);
+		_numPairSegments += segments->size();
 	}
 
 	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments" << std::endl;
@@ -560,11 +582,11 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(branch->getId());
 
 
-		if (_synapseEnclosingNeuronSegments[synapseSegmentId].size()>0){
-			std::cout<<"found all enclosing segments for a synapse segment!  "<<synapseSegmentId<<"  "<<_synapseEnclosingNeuronSegments[synapseSegmentId].size()<<std::endl;
-		} else {
-			count++;
-		}
+		//if (_synapseEnclosingNeuronSegments[synapseSegmentId].size()>0){
+		//	std::cout<<"found all enclosing segments for a synapse segment!  "<<synapseSegmentId<<"  "<<_synapseEnclosingNeuronSegments[synapseSegmentId].size()<<std::endl;
+		//} else {
+		//	count++;
+		//}
 		//for (std::vector<unsigned int>::const_iterator it=_synapseEnclosingNeuronSegments[synapseSegmentId].begin();
 		//		it!=_synapseEnclosingNeuronSegments[synapseSegmentId].end(); ++it){
 		//	std::cout<<(*it)<<" ,";

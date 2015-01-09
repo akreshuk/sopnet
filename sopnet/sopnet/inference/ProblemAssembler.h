@@ -101,10 +101,13 @@ private:
 	// all synapse segments in the problem
 	pipeline::Output<Segments>          _allSynapseSegments;
 
+	// all pair segments in the problem
+	pipeline::Output<Segments>			_allPairSegments;
+
 	// all linear constraints on all segments
 	pipeline::Output<LinearConstraints> _allLinearConstraints;
 
-	// mapping of segment ids to a continous range of variable numbers
+	// mapping of segment ids to a continuous range of variable numbers
 	pipeline::Output<ProblemConfiguration> _problemConfiguration;
 
 	// the consistency constraints extracted for the segments
@@ -120,10 +123,10 @@ private:
 	// is used in
 	std::map<unsigned int, unsigned int> _sliceIdsMap;
 
-	// map from mitochondria semgment ids to enclosing neuron segment ids
+	// map from mitochondria segment ids to enclosing neuron segment ids
 	std::map<unsigned int, std::vector<unsigned int> > _mitochondriaEnclosingNeuronSegments;
 
-	// map from synapse semgment ids to enclosing neuron segment ids
+	// map from synapse segment ids to enclosing neuron segment ids
 	std::map<unsigned int, std::vector<unsigned int> > _synapseEnclosingNeuronSegments;
 
 	// a counter for the number of segments that came in
@@ -134,6 +137,9 @@ private:
 
 	// number of synapse segments
 	unsigned int _numSynapseSegments;
+
+	// number of pair segments
+	unsigned int _numPairSegments;
 
 	// the total number of slices
 	unsigned int _numSlices;

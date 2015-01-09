@@ -290,12 +290,11 @@ Sopnet::createBasicPipeline() {
 	else if (_synapseSlices.isSet())
 		_synapseSegmentExtractorPipeline = boost::make_shared<SegmentExtractionPipeline>(_synapseSlices.getSharedPointer(), false, finishLastSection);
 
-	//std::vector<boost::shared_ptr<PairSegmentExtractor> > pairSegmentExtractors;
 	_pairSegmentExtractors.clear();
 	if (optionExtractPairSegments) {
 
 		for (unsigned int i = 0; i < _neuronSegmentExtractorPipeline->numIntervals(); i++) {
-
+			std::cout<<"Extracting pair segments for interval: "<<i<<std::endl;
 			boost::shared_ptr<PairSegmentExtractor> pairExtractor = boost::make_shared<PairSegmentExtractor>();
 			_pairSegmentExtractors.push_back(pairExtractor);
 

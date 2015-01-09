@@ -2,7 +2,7 @@
 #include "Segment.h"
 
 PairSegmentExtractor::PairSegmentExtractor(){
-	_minSynToNeuronDistance = 3;
+	_minSynToNeuronDistance = 1;
 
 	registerInput(_neuron_segments, "neuron segments");
 	registerInput(_synapse_segments, "synapse segments");
@@ -36,6 +36,7 @@ std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > >
 PairSegmentExtractor::createSynapseGroups(){
 	std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > > synapse_groups; //mapping from synapse id to its neighboring neurons
 	double avg_distance, max_distance, min_distance;
+	std::cout<<"creating synapse groups"<<std::endl;
 
 	foreach (boost::shared_ptr<Segment> synapseSegment, _synapse_segments->getSegments()){
 		std::vector<boost::shared_ptr<Slice> > prev_syn_slices = synapseSegment->getSourceSlices();
@@ -71,51 +72,27 @@ PairSegmentExtractor::createSynapseGroups(){
 			}
 
 		}
+		std::cout<<"for synapse with id "<<synapseSegment->getId()<<" collected "<<synapse_groups[synapseSegment->getId()].size()<<" neuron segments"<<std::endl;
 	}
 	return synapse_groups;
 }
 
 bool
-PairSegmentExtractor::isConflictPresent(boost::shared_ptr<Segment> s1, boost::shared_ptr<Segment> s2){
-
-	std::vector<boost::shared_ptr<Slice> > prev_slices_1 = s1->getSourceSlices();
-	std::vector<boost::shared_ptr<Slice> > prev_slices_2 = s2->getSourceSlices();
-	for (ConflictSets::iterator cs_it=_prev_slice_conflict_sets->begin(); cs_it!=_prev_slice_conflict_sets->end(); ++cs_it){
+PairSegmentExtractor::checkConflict(std::vector<boost::shared_ptr<Slice> > slices_1, std::vector<boost::shared_ptr<Slice> > slices_2, ConflictSets& cs){
+	for (ConflictSets::iterator cs_it=cs.begin(); cs_it!=cs.end(); ++cs_it){
 		bool n1_in = false;
 		bool n2_in = false;
-		foreach (boost::shared_ptr<Slice> slice_n1, prev_slices_1){
+		foreach (boost::shared_ptr<Slice> slice_n1, slices_1){
 			if (cs_it->getSlices().find(slice_n1->getId())!=cs_it->getSlices().end()){
 				n1_in = true;
 				break;
 			}
 		}
-		foreach (boost::shared_ptr<Slice> slice_n2, prev_slices_2){
+		foreach (boost::shared_ptr<Slice> slice_n2, slices_2){
 			if (cs_it->getSlices().find(slice_n2->getId())!=cs_it->getSlices().end()){
 				n2_in = true;
 				break;
 
-			}
-		}
-		if (n1_in && n2_in){
-			return true;
-		}
-	}
-	//TODO: make it a function, do not repeat the same thing twice
-	std::vector<boost::shared_ptr<Slice> > next_slices_1 = s1->getTargetSlices();
-	std::vector<boost::shared_ptr<Slice> > next_slices_2 = s2->getTargetSlices();
-	for (ConflictSets::iterator cs_it=_next_slice_conflict_sets->begin(); cs_it!=_next_slice_conflict_sets->end(); ++cs_it){
-		bool n1_in = false;
-		bool n2_in = false;
-		foreach (boost::shared_ptr<Slice> slice_n1, next_slices_1){
-			if (cs_it->getSlices().find(slice_n1->getId())!=cs_it->getSlices().end()){
-				n1_in = true;
-				break;
-			}
-		}
-		foreach (boost::shared_ptr<Slice> slice_n2, next_slices_2){
-			if (cs_it->getSlices().find(slice_n2->getId())!=cs_it->getSlices().end()){
-				n2_in = true;
-				break;
 			}
 		}
 		if (n1_in && n2_in){
@@ -125,6 +102,19 @@ PairSegmentExtractor::isConflictPresent(boost::shared_ptr<Segment> s1, boost::sh
 	return false;
 }
 
+
+bool
+PairSegmentExtractor::isConflictPresent(boost::shared_ptr<Segment> s1, boost::shared_ptr<Segment> s2){
+
+	bool conflict_prev = checkConflict(s1->getSourceSlices(), s2->getSourceSlices(), *_prev_slice_conflict_sets);
+	bool conflict_next = checkConflict(s1->getTargetSlices(), s2->getTargetSlices(), *_next_slice_conflict_sets);
+	if (conflict_prev || conflict_next){
+		return true;
+	} else {
+		return false;
+	}
+}
+
 std::vector<boost::shared_ptr<PairSegment> >
 PairSegmentExtractor::makePairs(std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > >& synapse_groups){
 
@@ -132,6 +122,11 @@ PairSegmentExtractor::makePairs(std::map<unsigned int, std::vector<boost::shared
 	typedef std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > > ::iterator map_iter;
 	for (map_iter it=synapse_groups.begin(); it!=synapse_groups.end(); ++it){
 		std::vector<boost::shared_ptr<Segment> > neuron_segments = it->second;
+		//std::cout<<"making pairs for synapse id "<<it->first<<std::endl;
+		if (neuron_segments.size()==0){
+			//std::cout<<"no neuron segments for synapse with id "<<it->first<<std::endl;
+			continue;
+		}
 		unsigned int nsegments = neuron_segments.size();
 		for (unsigned int i1=0; i1!=nsegments-1; ++i1 ){
 			for (unsigned int i2=i1+1; i2!=nsegments; ++i2){
@@ -145,6 +140,7 @@ PairSegmentExtractor::makePairs(std::map<unsigned int, std::vector<boost::shared
 			}
 		}
 	}
+	std::cout<<"PAIR SEGMENT EXTRACTOR"<<" extracted pair segments for all synapses, total number: "<<segments.size()<<std::endl;
 	return segments;
 
 
