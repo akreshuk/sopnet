@@ -10,6 +10,7 @@ PairSegment::PairSegment(
 				(segment1->getCenter()+segment2->getCenter())/2,
 				segment1->getInterSectionInterval()){}
 
+
 boost::shared_ptr<Segment>
 PairSegment::getSegment1() const {
 	return _segment1;

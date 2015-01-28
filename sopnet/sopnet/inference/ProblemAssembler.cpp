@@ -84,7 +84,7 @@ ProblemAssembler::updateOutputs() {
 void
 ProblemAssembler::collectSegments() {
 
-	LOG_DEBUG(problemassemblerlog) << "collecting segments..." << std::endl;
+	LOG_ALL(problemassemblerlog) << "collecting segments..." << std::endl;
 
 	_allSegments->clear(); 
 	_allNeuronSegments->clear();
@@ -92,7 +92,8 @@ ProblemAssembler::collectSegments() {
 	_numMitochondriaSegments = 0;
 	_allSynapseSegments->clear();
 	_numSynapseSegments = 0;
-	std::cout<<"clearing pair segments"<<std::endl;
+
+	LOG_ALL(problemassemblerlog) << "clearing pair segments" << std::endl;
 	_allPairSegments->clear();
 	_numPairSegments = 0;
 
@@ -145,6 +146,7 @@ ProblemAssembler::collectSegments() {
 	}
 
 
+	LOG_ALL(problemassemblerlog) << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, adding pair segments" << std::endl;
 	std::cout<<"PROBLEM ASSEMBLER, adding pair segments"<<std::endl;
 
 	foreach (boost::shared_ptr<Segments> segments, _pairSegments) {

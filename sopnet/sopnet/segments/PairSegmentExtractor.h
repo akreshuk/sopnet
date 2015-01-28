@@ -19,7 +19,6 @@ private:
 	bool checkConflict(std::vector<boost::shared_ptr<Slice> > slices_1, std::vector<boost::shared_ptr<Slice> > slices_2, ConflictSets& cs);
 	std::vector<boost::shared_ptr<PairSegment> > makePairs(std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > >& synapse_groups);
 
-
 	void updateOutputs();
 
 	pipeline::Input<Segments>     _neuron_segments;

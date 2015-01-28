@@ -16,7 +16,6 @@ public:
 			boost::shared_ptr<Segment> segment2);
 
 
-
 	boost::shared_ptr<Segment> getSegment1() const;
 	boost::shared_ptr<Segment> getSegment2() const;
 

@@ -1,7 +1,9 @@
 #include "PairSegmentExtractor.h"
 #include "Segment.h"
 
-PairSegmentExtractor::PairSegmentExtractor(){
+PairSegmentExtractor::PairSegmentExtractor():
+					_segments(new Segments()),
+					_constraints(new LinearConstraints()){
 	_minSynToNeuronDistance = 1;
 
 	registerInput(_neuron_segments, "neuron segments");
@@ -11,6 +13,10 @@ PairSegmentExtractor::PairSegmentExtractor(){
 
 	registerOutput(_segments, "segments");
 	registerOutput(_constraints, "linear constraints");
+
+	//TODO: activate those
+	//_prevConflictSets.registerCallback(&SegmentExtractor::onConflictSetsModified, this);
+	//_nextConflictSets.registerCallback(&SegmentExtractor::onConflictSetsModified, this);
 }
 
 void
@@ -22,10 +28,21 @@ PairSegmentExtractor::updateOutputs(){
 	//5) for all pairs, check, that it is not yet present
 
 	std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > > synapse_groups = createSynapseGroups();
-	std::vector<boost::shared_ptr<PairSegment> > pair_segments = makePairs(synapse_groups);
-	foreach (boost::shared_ptr<PairSegment> ps, pair_segments){
-		_segments->add(ps);
-	}
+	makePairs(synapse_groups);
+	//std::vector<boost::shared_ptr<PairSegment> > pair_segments;
+	//pair_segments = makePairs(synapse_groups);
+	//std::cout<<"pair segments returned, empty? "<<pair_segments.size()<<std::endl;
+	//if (pair_segments.size()>0){
+	//	for (unsigned int i=0; i<pair_segments.size(); ++i){
+	//		std::cout<<"adding segment: "<<i<<" "<<"segment id"<<pair_segments[i]->getId()<<std::endl;
+	//		_segments->add(pair_segments[i]);
+	//	}
+
+		//foreach (boost::shared_ptr<PairSegment> ps, pair_segments){
+
+			//_segments->add(ps);
+		//}
+	//}
 	_distance_prev.clearCache();
 	_distance_next.clearCache();
 
@@ -134,13 +151,15 @@ PairSegmentExtractor::makePairs(std::map<unsigned int, std::vector<boost::shared
 				bool conflict = isConflictPresent(neuron_segments[i1], neuron_segments[i2]);
 				if (!conflict){
 					boost::shared_ptr<PairSegment> ps = boost::make_shared<PairSegment>(Segment::getNextSegmentId(), neuron_segments[i1], neuron_segments[i2]);
-					segments.push_back(ps);
+					//segments.push_back(ps);
+					_segments->add(ps);
+					//std::cout<<"added segment from two neuron segments, "<<ps->getId()<<" "<<neuron_segments[i1]->getId()<<" "<<neuron_segments[i2]->getId()<<std::endl;
 				}
 
 			}
 		}
 	}
-	std::cout<<"PAIR SEGMENT EXTRACTOR"<<" extracted pair segments for all synapses, total number: "<<segments.size()<<std::endl;
+	//std::cout<<"PAIR SEGMENT EXTRACTOR"<<" extracted pair segments for all synapses, total number: "<<_segments->size()<<std::endl;
 	return segments;
 
 
