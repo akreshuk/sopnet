@@ -264,6 +264,8 @@ Sopnet::createBasicPipeline() {
 	_problemAssembler->clearInputs("mitochondria linear constraints");
 	_problemAssembler->clearInputs("synapse segments");
 	_problemAssembler->clearInputs("synapse linear constraints");
+	_problemAssembler->clearInputs("pair segments");
+	_problemAssembler->clearInputs("pair linear constraints");
 
 	bool finishLastSection = !_problemWriter;
 
@@ -300,6 +302,7 @@ Sopnet::createBasicPipeline() {
 
 			pairExtractor->setInput("neuron segments", _neuronSegmentExtractorPipeline->getSegments(i));
 			pairExtractor->setInput("synapse segments", _synapseSegmentExtractorPipeline->getSegments(i));
+			pairExtractor->setIntersectionInterval(i);
 
 			if (i > 0)
 				pairExtractor->setInput("prev neuron slice conflict sets", _neuronSegmentExtractorPipeline->getConflictSets(i-1));

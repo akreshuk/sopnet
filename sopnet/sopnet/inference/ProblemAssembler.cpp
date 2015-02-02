@@ -145,29 +145,16 @@ ProblemAssembler::collectSegments() {
 		_numSynapseSegments += segments->size();
 	}
 
-
-	LOG_ALL(problemassemblerlog) << "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA, adding pair segments" << std::endl;
 	std::cout<<"PROBLEM ASSEMBLER, adding pair segments"<<std::endl;
 
 	foreach (boost::shared_ptr<Segments> segments, _pairSegments) {
-		std::cout<<"add more pair segments!"<<std::endl;
+		std::cout<<"add more pair segments!"<<std::endl; //the loop is over intersection intervals
 		_allSegments->addAll(segments);
 		_allPairSegments->addAll(segments);
 		_numPairSegments += segments->size();
 	}
 
-	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments" << std::endl;
-
-	//LOG_DEBUG(problemassemblerlog) << "starting with pair segments"<<std::endl;
-	//FIXME: temporary hack, there should be a better way
-	//std::vector<boost::shared_ptr<LinearConstraints> > tempConstraints;
-	//foreach (boost::shared_ptr<LinearConstraints> constraints, _neuronLinearConstraints) {
-	//	tempConstraints.push_back(constraints);
-	//}
-	//PairSegmentCreator creator(*_allNeuronSegments, *_synapseImages, tempConstraints, 1.0);
-	//creator.groupBySynapse();
-	//extractSynapseEnclosingNeuronSegments();
-
+	LOG_DEBUG(problemassemblerlog) << "collected " << _allSegments->size() << " segments, out of them " <<_numPairSegments<<" pair segments"<< std::endl;
 
 }
 
@@ -214,6 +201,9 @@ ProblemAssembler::addExplanationConstraints() {
 	foreach (boost::shared_ptr<BranchSegment> segment, _allSegments->getBranches())
 		setCoefficient(*segment);
 
+	foreach (boost::shared_ptr<PairSegment> segment, _allSegments->getPairs())
+		setCoefficient(*segment);
+
 	LOG_DEBUG(problemassemblerlog) << "created " << _consistencyConstraints.size() << " linear constraints" << std::endl;
 
 	foreach (const LinearConstraint& constraint, _consistencyConstraints)
@@ -231,6 +221,9 @@ ProblemAssembler::addConsistencyConstraints() {
 		mapConstraints(linearConstraints);
 	foreach (boost::shared_ptr<LinearConstraints> linearConstraints, _mitochondriaLinearConstraints)
 		mapConstraints(linearConstraints);
+	foreach (boost::shared_ptr<LinearConstraints> linearConstraints, _pairLinearConstraints)
+		mapConstraints(linearConstraints);
+
 
 	LOG_DEBUG(problemassemblerlog) << "collected " << _allLinearConstraints->size() << " linear constraints" << std::endl;
 }
@@ -299,14 +292,17 @@ ProblemAssembler::addSynapseConstraints() {
 	_synapseConstraints = LinearConstraints(_numSynapseSegments);
 
 	LinearConstraints::iterator constraint = _synapseConstraints.begin();
+	std::cout<<"processing synapses, segments in total "<<_allSynapseSegments->size()<<std::endl;
 	foreach (boost::shared_ptr<Segment> synapseSegment, _allSynapseSegments->getSegments()) {
 
 		LOG_ALL(problemassemblerlog) << "processing synapse segment " << synapseSegment->getId() << std::endl;
 
 		unsigned int synapseSegmentId = synapseSegment->getId();
 		unsigned int n = getSynapseEnclosingNeuronSegments(synapseSegmentId).size();
+		unsigned int ntouch = _synapseTouchingNeuronSegments[synapseSegmentId].size();
 
 		LOG_ALL(problemassemblerlog) << "synapse segment has " << n << " enclosing neuron segments" << std::endl;
+		std::cout<<"synapse segment "<<synapseSegment->getId()<<" has "<< ntouch << " touching neuron segments"<< std::endl;
 
 		if (n == 0)
 			continue;
@@ -444,6 +440,16 @@ ProblemAssembler::setCoefficient(const BranchSegment& branch) {
 }
 
 void
+ProblemAssembler::setCoefficient(const PairSegment& pair) {
+	/* Looks like we don't need anything else.
+	 * TODO: check later
+	 */
+	_problemConfiguration->setVariable(pair, _numSegments);
+	_numSegments++;
+
+}
+
+void
 ProblemAssembler::extractSliceIdsMap() {
 
 	_numSlices = 0;
@@ -547,14 +553,8 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 	unsigned int maxSynapseNeuronDistance = optionMaxSynapseNeuronDistance;
 	_enclosingSynapseThreshold = optionSynapseEnclosingThreshold;
 
-	//std::cout<<"Here we are!"<<std::endl;
-	//std::cout<<"synapse enclosing threshold:"<<_enclosingSynapseThreshold<<std::endl;
-
-	unsigned int count = 0;
 	foreach (boost::shared_ptr<Segment> synapseSegment, _allSynapseSegments->getSegments()) {
 
-
-		//std::cout<<"Processing another synapse segment!"<<std::endl;
 		unsigned int synapseSegmentId = synapseSegment->getId();
 
 		boost::shared_ptr<EndSegment> end;
@@ -565,38 +565,59 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 		foreach (boost::tie(end, distance), _allNeuronSegments->findEnds(
 				synapseSegment->getCenter(),
 				synapseSegment->getInterSectionInterval(),
-				maxSynapseNeuronDistance))
+				maxSynapseNeuronDistance)){
 			if (encloses(end, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(end->getId());
+			if (touches(end, synapseSegment)){
+				_synapseTouchingNeuronSegments[synapseSegmentId].push_back(end->getId());
+			}
+		}
+
 
 		foreach (boost::tie(continuation, distance), _allNeuronSegments->findContinuations(
 				synapseSegment->getCenter(),
 				synapseSegment->getInterSectionInterval(),
-				maxSynapseNeuronDistance))
+				maxSynapseNeuronDistance)){
 			if (encloses(continuation, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(continuation->getId());
+			if (touches(continuation, synapseSegment)){
+				_synapseTouchingNeuronSegments[synapseSegmentId].push_back(continuation->getId());
 
+			}
+		}
 		foreach (boost::tie(branch, distance), _allNeuronSegments->findBranches(
 				synapseSegment->getCenter(),
 				synapseSegment->getInterSectionInterval(),
-				maxSynapseNeuronDistance))
+				maxSynapseNeuronDistance)){
 			if (encloses(branch, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(branch->getId());
 
-
-		//if (_synapseEnclosingNeuronSegments[synapseSegmentId].size()>0){
-		//	std::cout<<"found all enclosing segments for a synapse segment!  "<<synapseSegmentId<<"  "<<_synapseEnclosingNeuronSegments[synapseSegmentId].size()<<std::endl;
-		//} else {
-		//	count++;
-		//}
-		//for (std::vector<unsigned int>::const_iterator it=_synapseEnclosingNeuronSegments[synapseSegmentId].begin();
-		//		it!=_synapseEnclosingNeuronSegments[synapseSegmentId].end(); ++it){
-		//	std::cout<<(*it)<<" ,";
-		//}
-
-		//std::cout<<_synapseEnclosingNeuronSegments[synapseSegmentId]<<std::endl;
+			if (touches(branch, synapseSegment)){
+				_synapseTouchingNeuronSegments[synapseSegmentId].push_back(branch->getId());
+			}
+		}
 	}
-	std::cout<<"total without neuron segments: "<<count<<std::endl;
+}
+
+bool
+ProblemAssembler::touches(boost::shared_ptr<Segment> neuronSegment, boost::shared_ptr<Segment> synapseSegment) {
+	/* Find, if the neuron touches the synapse (defined as having at least 1 pixel overlap
+	 *
+	 */
+
+	// get the neuron source and target slices
+	std::vector<boost::shared_ptr<Slice> > neuronSourceSlices = neuronSegment->getSourceSlices();
+	std::vector<boost::shared_ptr<Slice> > neuronTargetSlices = neuronSegment->getTargetSlices();
+
+	if (neuronSegment->getDirection() != synapseSegment->getDirection())
+		std::swap(neuronSourceSlices, neuronTargetSlices);
+
+
+	// get the overlap
+	unsigned int sourceOverlap = getOverlap(neuronSourceSlices, synapseSegment->getSourceSlices());
+	unsigned int targetOverlap = getOverlap(neuronTargetSlices, synapseSegment->getTargetSlices());
+
+	return (double)(sourceOverlap + targetOverlap)>=1;
 }
 
 bool

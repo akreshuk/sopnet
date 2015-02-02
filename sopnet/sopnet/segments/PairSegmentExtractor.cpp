@@ -3,13 +3,14 @@
 
 PairSegmentExtractor::PairSegmentExtractor():
 					_segments(new Segments()),
-					_constraints(new LinearConstraints()){
+					_constraints(new LinearConstraints()),
+					_intersectionInterval(9999){
 	_minSynToNeuronDistance = 1;
 
 	registerInput(_neuron_segments, "neuron segments");
 	registerInput(_synapse_segments, "synapse segments");
-	registerInput(_prev_slice_conflict_sets, "prev neuron slice conflict sets");
-	registerInput(_next_slice_conflict_sets, "next neuron slice conflict sets");
+	registerInput(_prev_slice_conflict_sets, "prev neuron slice conflict sets", pipeline::Optional);
+	registerInput(_next_slice_conflict_sets, "next neuron slice conflict sets", pipeline::Optional);
 
 	registerOutput(_segments, "segments");
 	registerOutput(_constraints, "linear constraints");
@@ -27,6 +28,8 @@ PairSegmentExtractor::updateOutputs(){
 	//4) for all pairs, check if members are not in conflict
 	//5) for all pairs, check, that it is not yet present
 
+
+	std::cout<<"updating outputs of pair segment extractor at intersection interval "<<_intersectionInterval<<std::endl;
 	std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > > synapse_groups = createSynapseGroups();
 	makePairs(synapse_groups);
 	//std::vector<boost::shared_ptr<PairSegment> > pair_segments;
@@ -53,7 +56,7 @@ std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > >
 PairSegmentExtractor::createSynapseGroups(){
 	std::map<unsigned int, std::vector<boost::shared_ptr<Segment> > > synapse_groups; //mapping from synapse id to its neighboring neurons
 	double avg_distance, max_distance, min_distance;
-	std::cout<<"creating synapse groups"<<std::endl;
+	std::cout<<"creating synapse groups for "<<_synapse_segments->getSegments().size()<<" synapse segments"<<std::endl;
 
 	foreach (boost::shared_ptr<Segment> synapseSegment, _synapse_segments->getSegments()){
 		std::vector<boost::shared_ptr<Slice> > prev_syn_slices = synapseSegment->getSourceSlices();
@@ -66,7 +69,8 @@ PairSegmentExtractor::createSynapseGroups(){
 			foreach (boost::shared_ptr<Slice> synapseSlice, prev_syn_slices){
 				foreach (boost::shared_ptr<Slice> neuronSlice, prev_neuron_slices) {
 					_distance_prev(*synapseSlice, *neuronSlice, true, false, avg_distance, max_distance, min_distance);
-					if (min_distance<_minSynToNeuronDistance){
+					//if (min_distance<_minSynToNeuronDistance){
+					if (min_distance==0){
 						synapse_groups[synapseSegment->getId()].push_back(neuronSegment);
 						found_in_prev = true;
 						break;
@@ -81,7 +85,8 @@ PairSegmentExtractor::createSynapseGroups(){
 			foreach (boost::shared_ptr<Slice> synapseSlice, next_syn_slices){
 				foreach (boost::shared_ptr<Slice> neuronSlice, next_neuron_slices) {
 					_distance_next(*synapseSlice, *neuronSlice, true, false, avg_distance, max_distance, min_distance);
-					if (min_distance<_minSynToNeuronDistance){
+					//if (min_distance<_minSynToNeuronDistance){
+					if (min_distance==0) {
 						synapse_groups[synapseSegment->getId()].push_back(neuronSegment);
 						break;
 					}
@@ -123,13 +128,27 @@ PairSegmentExtractor::checkConflict(std::vector<boost::shared_ptr<Slice> > slice
 bool
 PairSegmentExtractor::isConflictPresent(boost::shared_ptr<Segment> s1, boost::shared_ptr<Segment> s2){
 
-	bool conflict_prev = checkConflict(s1->getSourceSlices(), s2->getSourceSlices(), *_prev_slice_conflict_sets);
-	bool conflict_next = checkConflict(s1->getTargetSlices(), s2->getTargetSlices(), *_next_slice_conflict_sets);
+	bool conflict_prev = false;
+	bool conflict_next = false;
+	if (_prev_slice_conflict_sets.isSet())
+		conflict_prev = checkConflict(s1->getSourceSlices(), s2->getSourceSlices(), *_prev_slice_conflict_sets);
+	if (_next_slice_conflict_sets.isSet())
+		conflict_next = checkConflict(s1->getTargetSlices(), s2->getTargetSlices(), *_next_slice_conflict_sets);
 	if (conflict_prev || conflict_next){
 		return true;
 	} else {
 		return false;
 	}
+}
+
+LinearConstraint
+PairSegmentExtractor::makeConstraint(unsigned int segment_id_1, unsigned int segment_id_2){
+	LinearConstraint constraint;
+	constraint.setCoefficient(segment_id_1, 1.0);
+	constraint.setCoefficient(segment_id_2, 1.0);
+	constraint.setRelation(Equal);
+	constraint.setValue(2.0);
+	return constraint;
 }
 
 std::vector<boost::shared_ptr<PairSegment> >
@@ -153,6 +172,11 @@ PairSegmentExtractor::makePairs(std::map<unsigned int, std::vector<boost::shared
 					boost::shared_ptr<PairSegment> ps = boost::make_shared<PairSegment>(Segment::getNextSegmentId(), neuron_segments[i1], neuron_segments[i2]);
 					//segments.push_back(ps);
 					_segments->add(ps);
+					_constraints->add(makeConstraint(ps->getId(), neuron_segments[i1]->getId()));
+					_constraints->add(makeConstraint(ps->getId(), neuron_segments[i2]->getId()));
+					_constraints->add(makeConstraint(ps->getId(), it->first)); //synapse should be in as well
+
+
 					//std::cout<<"added segment from two neuron segments, "<<ps->getId()<<" "<<neuron_segments[i1]->getId()<<" "<<neuron_segments[i2]->getId()<<std::endl;
 				}
 

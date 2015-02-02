@@ -36,6 +36,8 @@ private:
 
 	void setCoefficient(const BranchSegment& branch);
 
+	void setCoefficient(const PairSegment& pair);
+
 	void extractSliceIdsMap();
 
 	void addSlices(const EndSegment& end);
@@ -54,6 +56,11 @@ private:
 			boost::shared_ptr<Segment> neuronSegment,
 			boost::shared_ptr<Segment> otherSegment,
 			double enclosingThreshold);
+
+	bool
+	touches(
+			boost::shared_ptr<Segment> neuronSegment,
+			boost::shared_ptr<Segment> synapseSegment);
 
 	unsigned int getOverlap(
 			const std::vector<boost::shared_ptr<Slice> >& slices1,
@@ -128,6 +135,9 @@ private:
 
 	// map from synapse segment ids to enclosing neuron segment ids
 	std::map<unsigned int, std::vector<unsigned int> > _synapseEnclosingNeuronSegments;
+
+	// map from synapse segment ids to touching neuron segment ids
+	std::map<unsigned int, std::vector<unsigned int> > _synapseTouchingNeuronSegments;
 
 	// a counter for the number of segments that came in
 	unsigned int _numSegments;
