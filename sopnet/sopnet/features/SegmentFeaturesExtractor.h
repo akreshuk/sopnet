@@ -10,6 +10,7 @@
 class GeometryFeatureExtractor;
 class HistogramFeatureExtractor;
 class TypeFeatureExtractor;
+class PairFeatureExtractor;
 
 class SegmentFeaturesExtractor : public pipeline::ProcessNode {
 
@@ -45,6 +46,8 @@ private:
 	boost::shared_ptr<HistogramFeatureExtractor> _histogramFeatureExtractor;
 
 	boost::shared_ptr<TypeFeatureExtractor> _typeFeatureExtractor;
+
+	boost::shared_ptr<PairFeatureExtractor> _pairFeatureExtractor;
 
 	boost::shared_ptr<FeaturesAssembler> _featuresAssembler;
 };

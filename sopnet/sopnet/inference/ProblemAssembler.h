@@ -60,7 +60,8 @@ private:
 	bool
 	touches(
 			boost::shared_ptr<Segment> neuronSegment,
-			boost::shared_ptr<Segment> synapseSegment);
+			boost::shared_ptr<Segment> synapseSegment,
+			double distance);
 
 	unsigned int getOverlap(
 			const std::vector<boost::shared_ptr<Slice> >& slices1,

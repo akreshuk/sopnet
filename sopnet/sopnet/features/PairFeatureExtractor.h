@@ -18,6 +18,7 @@ private:
 
 	pipeline::Input<Segments>   _segments;
 	pipeline::Input<ImageStack> _synapseImages;
+	pipeline::Input<ImageStack> _vesicleImages; //segmented vesicles, connected components image
 	pipeline::Output<Features>  _features;
 };
 

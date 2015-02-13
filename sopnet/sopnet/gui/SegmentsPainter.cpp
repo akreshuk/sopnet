@@ -134,6 +134,7 @@ void
 SegmentsPainter::loadTextures(const EndSegment& end) {
 
 	loadTexture(*end.getSlice());
+	std::cout<<"drawing end segment: "<<end.getId()<<std::endl;
 }
 
 void
@@ -141,6 +142,8 @@ SegmentsPainter::loadTextures(const ContinuationSegment& continuation) {
 
 	loadTexture(*continuation.getSourceSlice());
 	loadTexture(*continuation.getTargetSlice());
+	std::cout<<"drawing cont segment: "<<continuation.getId()<<std::endl;
+
 }
 
 void
@@ -149,6 +152,8 @@ SegmentsPainter::loadTextures(const BranchSegment& branch) {
 	loadTexture(*branch.getSourceSlice());
 	loadTexture(*branch.getTargetSlice1());
 	loadTexture(*branch.getTargetSlice2());
+	std::cout<<"drawing branch segment: "<<branch.getId()<<std::endl;
+
 }
 
 void

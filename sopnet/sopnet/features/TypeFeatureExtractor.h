@@ -22,6 +22,8 @@ private:
 
 	void computeFeatures(const BranchSegment& branch, std::vector<double>& features);
 
+	void computeFeatures(const PairSegment& pair, std::vector<double>& features); //FIXME: why is that function needed?
+
 	void updateOutputs();
 
 	pipeline::Input<Segments> _segments;

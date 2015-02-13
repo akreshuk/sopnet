@@ -4,11 +4,17 @@
 PairSegment::PairSegment(
 		unsigned int id,
 		boost::shared_ptr<Segment> segment1,
-		boost::shared_ptr<Segment> segment2) :
+		boost::shared_ptr<Segment> segment2,
+		boost::shared_ptr<Segment> synapseSegment,
+		SynapseDirection dir) :
 		Segment(id,
 				segment1->getDirection(),
 				(segment1->getCenter()+segment2->getCenter())/2,
-				segment1->getInterSectionInterval()){}
+				segment1->getInterSectionInterval()),
+		_segment1(segment1),
+		_segment2(segment2),
+		_synapseSegment(synapseSegment),
+		_synapseDirection(dir){}
 
 
 boost::shared_ptr<Segment>

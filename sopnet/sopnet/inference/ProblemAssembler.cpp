@@ -25,7 +25,7 @@ util::ProgramOption optionMaxSynapseNeuronDistance(
 		util::_module           = "sopnet.segments",
 		util::_long_name        = "maxSynapseNeuronDistance",
 		util::_description_text = "The maximal center distance between a synapse slice and an enclosing neuron slice.",
-		util::_default_value    = 1000);
+		util::_default_value    = 1000000);
 
 util::ProgramOption optionSynapseEnclosingThreshold(
 		util::_module           = "sopnet.segments",
@@ -568,7 +568,7 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 				maxSynapseNeuronDistance)){
 			if (encloses(end, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(end->getId());
-			if (touches(end, synapseSegment)){
+			if (touches(end, synapseSegment, distance)){
 				_synapseTouchingNeuronSegments[synapseSegmentId].push_back(end->getId());
 			}
 		}
@@ -580,7 +580,7 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 				maxSynapseNeuronDistance)){
 			if (encloses(continuation, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(continuation->getId());
-			if (touches(continuation, synapseSegment)){
+			if (touches(continuation, synapseSegment, distance)){
 				_synapseTouchingNeuronSegments[synapseSegmentId].push_back(continuation->getId());
 
 			}
@@ -592,7 +592,7 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 			if (encloses(branch, synapseSegment, _enclosingSynapseThreshold))
 				_synapseEnclosingNeuronSegments[synapseSegmentId].push_back(branch->getId());
 
-			if (touches(branch, synapseSegment)){
+			if (touches(branch, synapseSegment, distance)){
 				_synapseTouchingNeuronSegments[synapseSegmentId].push_back(branch->getId());
 			}
 		}
@@ -600,8 +600,8 @@ ProblemAssembler::extractSynapseEnclosingNeuronSegments() {
 }
 
 bool
-ProblemAssembler::touches(boost::shared_ptr<Segment> neuronSegment, boost::shared_ptr<Segment> synapseSegment) {
-	/* Find, if the neuron touches the synapse (defined as having at least 1 pixel overlap
+ProblemAssembler::touches(boost::shared_ptr<Segment> neuronSegment, boost::shared_ptr<Segment> synapseSegment, double distance) {
+	/* Find, if the neuron touches the synapse (defined as having at least 1 pixel overlap)
 	 *
 	 */
 
@@ -616,6 +616,12 @@ ProblemAssembler::touches(boost::shared_ptr<Segment> neuronSegment, boost::share
 	// get the overlap
 	unsigned int sourceOverlap = getOverlap(neuronSourceSlices, synapseSegment->getSourceSlices());
 	unsigned int targetOverlap = getOverlap(neuronTargetSlices, synapseSegment->getTargetSlices());
+
+	if (synapseSegment->getId()==9728 && (sourceOverlap>0 || targetOverlap>0)){
+		std::cout<<"In the touch function of ProblemAssembler, neuron id: "<<neuronSegment->getId()<<" , sourceOverlap: "<<sourceOverlap<<
+				", targetOverlap: "<<targetOverlap<<", distance: "<<distance<<std::endl;
+
+	}
 
 	return (double)(sourceOverlap + targetOverlap)>=1;
 }
