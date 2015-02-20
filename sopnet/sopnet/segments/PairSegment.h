@@ -42,6 +42,7 @@ public:
     */
 
 	std::vector<boost::shared_ptr<Slice> > getSlices() const;
+	SynapseDirection getSynapseDirection() const {return _synapseDirection;}
 
 private:
 

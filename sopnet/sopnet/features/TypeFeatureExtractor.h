@@ -13,6 +13,7 @@ public:
 
 private:
 
+	/*
 	template <typename SegmentType>
 	void getFeatures(const SegmentType& segment);
 
@@ -24,6 +25,7 @@ private:
 
 	void computeFeatures(const PairSegment& pair, std::vector<double>& features); //FIXME: why is that function needed?
 
+*/
 	void updateOutputs();
 
 	pipeline::Input<Segments> _segments;

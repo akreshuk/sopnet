@@ -1,8 +1,10 @@
-#include <vigra/multi_distance.hxx>
-//#include <vigra/multi_impex.hxx>
+
 
 #include <util/Logger.h>
 #include "DistanceToleranceFunction.h"
+
+#include <vigra/multi_distance.hxx>
+//#include <vigra/multi_impex.hxx>
 
 logger::LogChannel distancetolerancelog("distancetolerancelog", "[DistanceToleranceFunction] ");
 
