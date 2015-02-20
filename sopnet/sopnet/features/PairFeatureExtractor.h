@@ -21,7 +21,6 @@ private:
 
 	void updateOutputs();
 
-	double returnSomething(unsigned int id);
 	double computeSizeFeature(boost::shared_ptr<PairSegment> segment);
 	unsigned int computeSize(std::vector<boost::shared_ptr<Slice> > slices);
 

@@ -54,8 +54,7 @@ PairFeatureExtractor::updateOutputs() {
 	foreach (boost::shared_ptr<PairSegment> segment, _segments->getPairs()) {
 
 		// TODO: ...
-		//_features->get(segment->getId())[0] = computeSizeFeature(segment);
-		_features->get(segment->getId())[0] = returnSomething(segment->getId());
+		_features->get(segment->getId())[0] = computeSizeFeature(segment);
 
 		//_features->get(segment->getId())[1] = Features::NoFeatureValue;
 		//_features->get(segment->getId())[2] = Features::NoFeatureValue;
@@ -63,12 +62,8 @@ PairFeatureExtractor::updateOutputs() {
 	}
 }
 
-double
-returnSomething(unsigned int id){
-	return 0.0;
-}
 unsigned int
-computeSize(std::vector<boost::shared_ptr<Slice> > slices){
+PairFeatureExtractor::computeSize(std::vector<boost::shared_ptr<Slice> > slices){
 	if (slices.size()!=1) {
 		//>1: this is a branching segment, this shouldn't happen
 		//=0: end segment, has no size
@@ -79,7 +74,7 @@ computeSize(std::vector<boost::shared_ptr<Slice> > slices){
 }
 
 double
-computeSizeFeature(boost::shared_ptr<PairSegment> pair){
+PairFeatureExtractor::computeSizeFeature(boost::shared_ptr<PairSegment> pair){
 
 	std::vector<boost::shared_ptr<Slice> > sources1 = pair->getSegment1()->getSourceSlices();
 	std::vector<boost::shared_ptr<Slice> > sources2 = pair->getSegment2()->getSourceSlices();
